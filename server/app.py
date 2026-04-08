@@ -206,8 +206,10 @@ def list_tasks():
 
 
 @app.post("/reset", response_model=AeroSyncObservation)
-def reset(request: ResetRequest):
+def reset(request: Optional[ResetRequest] = None):
     global _env
+    if request is None:
+        request = ResetRequest()
     task_name = request.task_name.lower().strip()
     if task_name not in TASK_CONFIGS:
         raise HTTPException(
