@@ -1,0 +1,155 @@
+"""
+AeroSync AI — Medium Task Grader
+==================================
+Difficulty: 2 / 3
+Weights: completion=0.45, efficiency=0.18, safety=0.17, priority=0.10, drone_quality=0.10
+
+Entrypoint expected by openenv.yaml:
+    grade(state: dict) -> float  in [0.0, 1.0]
+"""
+from __future__ import annotations
+from typing import Any, Dict
+
+from env.models import TaskStatus
+
+# ─── Grading weights ──────────────────────────────────────────────────────────
+_WEIGHTS = {
+    "completion_weight": 0.45,
+    "efficiency_weight": 0.18,
+    "safety_weight":     0.17,
+    "priority_weight":   0.10,
+    "drone_weight":      0.10,
+}
+
+# ─── Penalty magnitudes ───────────────────────────────────────────────────────
+_COLLISION_HIT      = 0.10
+_BATTERY_FAIL_HIT   = 0.15
+_FORCED_RTB_HIT     = 0.05
+_NEAR_MISS_HIT      = 0.03
+_MOTOR_DEGRADED_HIT = 0.10
+
+
+# ─── Helpers ─────────────────────────────────────────────────────────────────
+
+def _delivered_set(tasks: Dict[str, Any]) -> list:
+    return [
+        t for t in tasks.values()
+        if t.get("status") in ("delivered", TaskStatus.DELIVERED)
+    ]
+
+
+def _priority_score(tasks: Dict[str, Any]) -> float:
+    delivered = _delivered_set(tasks)
+    if not delivered:
+        return 0.0
+    total_priority = sum(t.get("priority", 1) for t in delivered)
+    max_possible   = 3 * len(delivered)
+    return total_priority / max_possible if max_possible > 0 else 0.0
+
+
+def _drone_quality_score(state: Dict[str, Any]) -> float:
+    drone_states = state.get("drone_states", {})
+    if not drone_states:
+        return 1.0
+
+    total_near_misses  = 0
+    total_forced_rtb   = 0
+    avg_motor_health   = 0.0
+    avg_stab_score     = 0.0
+    total_deliveries   = 0
+    total_failed_drops = 0
+
+    for drone in drone_states.values():
+        diag = drone.get("diagnostics", {}) if isinstance(drone, dict) else {}
+        fl   = drone.get("flight",      {}) if isinstance(drone, dict) else {}
+
+        total_near_misses  += diag.get("near_miss_count",        0)
+        total_forced_rtb   += diag.get("forced_rtb_count",       0)
+        avg_motor_health   += diag.get("motor_health",           1.0)
+        avg_stab_score     += fl.get("hover_stability_score",    1.0)
+        total_deliveries   += diag.get("total_deliveries",       0)
+        total_failed_drops += diag.get("total_failed_deliveries", 0)
+
+    n = len(drone_states)
+    avg_motor_health /= n
+    avg_stab_score   /= n
+
+    deduction = 0.0
+    deduction += min(total_near_misses * _NEAR_MISS_HIT,  0.4)
+    deduction += min(total_forced_rtb  * _FORCED_RTB_HIT, 0.3)
+
+    if avg_motor_health < 0.8:
+        deduction += _MOTOR_DEGRADED_HIT * (0.8 - avg_motor_health) / 0.8
+
+    if avg_stab_score < 0.7:
+        deduction += 0.1 * (0.7 - avg_stab_score) / 0.7
+
+    total_attempts = total_deliveries + total_failed_drops
+    if total_attempts > 0:
+        drop_failure_rate = total_failed_drops / total_attempts
+        deduction += min(drop_failure_rate * 0.2, 0.2)
+
+    return round(float(max(0.0, 1.0 - deduction)), 4)
+
+
+# ─── Public API ───────────────────────────────────────────────────────────────
+
+def grade(state: Dict[str, Any]) -> float:
+    """
+    Grade a completed (or timed-out) medium-difficulty episode.
+
+    Args:
+        state: dict returned by env.state()
+
+    Returns:
+        float in [0.0, 1.0]
+    """
+    tasks = state.get("tasks", {})
+    if not tasks:
+        return 0.0
+
+    # 1. Completion ratio
+    total_tasks      = len(tasks)
+    delivered        = len(_delivered_set(tasks))
+    completion_ratio = delivered / total_tasks
+
+    # 2. Priority-weighted completion
+    priority_score = _priority_score(tasks)
+
+    # 3. Efficiency
+    steps_used       = state.get("step",      1)
+    max_steps        = state.get("max_steps", 1)
+    efficiency_ratio = max(0.0, 1.0 - (steps_used / max_steps) * 0.5) if max_steps > 0 else 0.5
+
+    # 4. Safety
+    collisions       = state.get("collision_count",  0)
+    battery_failures = state.get("battery_failures", 0)
+    forced_rtb       = sum(
+        (d.get("diagnostics", {}) if isinstance(d, dict) else {}).get("forced_rtb_count", 0)
+        for d in state.get("drone_states", {}).values()
+    )
+    near_misses      = sum(
+        (d.get("diagnostics", {}) if isinstance(d, dict) else {}).get("near_miss_count", 0)
+        for d in state.get("drone_states", {}).values()
+    )
+    safety_deduction = (
+        collisions       * _COLLISION_HIT
+        + battery_failures * _BATTERY_FAIL_HIT
+        + forced_rtb       * _FORCED_RTB_HIT
+        + near_misses      * _NEAR_MISS_HIT
+    )
+    safety_factor = max(0.0, 1.0 - safety_deduction)
+
+    # 5. Drone quality
+    drone_score = _drone_quality_score(state)
+
+    # 6. Weighted sum
+    score = (
+        _WEIGHTS["completion_weight"] * completion_ratio
+        + _WEIGHTS["efficiency_weight"] * efficiency_ratio
+        + _WEIGHTS["safety_weight"]     * safety_factor
+        + _WEIGHTS["priority_weight"]   * priority_score
+        + _WEIGHTS["drone_weight"]      * drone_score
+    )
+
+    return round(float(min(1.0, max(0.0, score))), 4)
