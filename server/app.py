@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse, HTMLResponse, RedirectResponse
 from pydantic import BaseModel, Field
@@ -206,11 +206,17 @@ def list_tasks():
 
 
 @app.post("/reset", response_model=AeroSyncObservation)
-def reset(request: Optional[ResetRequest] = None):
+async def reset(request: Request):
     global _env
-    if request is None:
-        request = ResetRequest()
-    task_name = request.task_name.lower().strip()
+    try:
+        body = await request.json()
+        if isinstance(body, dict):
+            task_name = body.get("task_name", "easy")
+        else:
+            task_name = "easy"
+    except Exception:
+        task_name = "easy"
+    task_name = str(task_name).lower().strip()
     if task_name not in TASK_CONFIGS:
         raise HTTPException(
             status_code=422,
