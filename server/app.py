@@ -50,6 +50,8 @@ async def lifespan(app: FastAPI):
             "max_steps":   cfg.get("max_steps", 0),
             "grid":        {"width": cfg["grid_width"], "height": cfg["grid_height"]},
             "dispatch_zones": len(cfg.get("dispatch_zones", [])),
+            "has_grader": True,
+            "grader": True,
             "grading_weights": {
                 "completion":    params["completion_weight"],
                 "efficiency":    params["efficiency_weight"],
@@ -194,6 +196,8 @@ def list_tasks():
             "max_steps":   cfg.get("max_steps", 0),
             "grid":        {"width": cfg["grid_width"], "height": cfg["grid_height"]},
             "dispatch_zones": len(cfg.get("dispatch_zones", [])),
+            "has_grader": True,
+            "grader": True,
             "grading_weights": {
                 "completion":    params["completion_weight"],
                 "efficiency":    params["efficiency_weight"],

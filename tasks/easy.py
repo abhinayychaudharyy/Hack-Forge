@@ -78,6 +78,20 @@ def get_config() -> Dict[str, Any]:
                 "delivery": {"x": 8, "y": 9, "z": 0},   # customer address
                 "priority": 1,
             },
+            {
+                "id":       "task_2",
+                "item":     "Medicine",
+                "pickup":   {"x": 5, "y": 2, "z": 0},   # shelf
+                "delivery": {"x": 1, "y": 9, "z": 0},   # customer address
+                "priority": 1,
+            },
+            {
+                "id":       "task_3",
+                "item":     "Electronics",
+                "pickup":   {"x": 7, "y": 3, "z": 0},   # shelf
+                "delivery": {"x": 9, "y": 5, "z": 0},   # customer address
+                "priority": 1,
+            },
         ],
 
         # ── Map Geometry ──────────────────────────────────────────────────

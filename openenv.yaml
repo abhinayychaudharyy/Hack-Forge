@@ -28,8 +28,10 @@ tasks:
     difficulty: 1
     agents:
       drones: 2
-    task_count: 2
+    task_count: 4
     max_steps: 120
+    has_grader: true
+    grader: true
     expected_score_random: 0.10
     expected_score_baseline: 0.45
 
@@ -40,6 +42,8 @@ tasks:
       drones: 4
     task_count: 6
     max_steps: 250
+    has_grader: true
+    grader: true
     expected_score_random: 0.07
     expected_score_baseline: 0.32
 
@@ -50,6 +54,8 @@ tasks:
       drones: 6
     task_count: 12
     max_steps: 500
+    has_grader: true
+    grader: true
     expected_score_random: 0.05
     expected_score_baseline: 0.22
 
