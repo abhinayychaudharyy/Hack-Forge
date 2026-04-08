@@ -25,6 +25,7 @@ from tasks.medium import get_config as medium_config
 from tasks.hard   import get_config as hard_config
 
 API_BASE_URL = os.environ.get("API_BASE_URL", "https://api.openai.com/v1")
+ENV_BASE_URL = os.environ.get("ENV_BASE_URL", "https://vj-ai27-hack-forge.hf.space")
 MODEL_NAME   = os.environ.get("MODEL_NAME",   "gpt-4o-mini")
 API_KEY      = os.environ.get("OPENAI_API_KEY") or os.environ.get("HF_TOKEN", "")
 

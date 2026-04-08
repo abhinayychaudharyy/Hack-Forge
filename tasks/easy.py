@@ -38,7 +38,7 @@ def get_config() -> Dict[str, Any]:
         "task_name":   "easy",
         "grid_width":  10,
         "grid_height": 10,
-        "max_steps":   120,
+        "max_steps":   100,
 
         # ── Drones ───────────────────────────────────────────────────────
         # drone_0 — starts near task_0 shelf, full battery

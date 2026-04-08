@@ -66,7 +66,44 @@ At the end of each episode, the environment generates a **Detailed Grading Repor
 
 ---
 
-## Setup & Usage
+## 🚀 Quick Start: Standard OpenEnv Access
+
+AeroSync AI supports the standard OpenEnv protocol for both synchronous and asynchronous agent interaction.
+
+### 📦 Installation
+Install the client package directly from this Space:
+```bash
+pip install git+https://huggingface.co/spaces/abhinayychaudharyy/aerosync-ai
+```
+
+### 🤖 Basic Usage (Python Client)
+```python
+import asyncio
+from client import AeroSyncEnv, AeroSyncAction
+
+async def main():
+    # 1. Connect to the Space (Async)
+    async with AeroSyncEnv(base_url="https://abhinayychaudharyy-aerosync-ai.hf.space") as env:
+        # 2. Reset the environment
+        obs = await env.reset(task_name="easy")
+        print(f"Mission Start at Step {obs.step}")
+        
+        # 3. Step through the mission
+        action = AeroSyncAction(agent_id="drone_0", action_type="wait")
+        obs, reward, done, info = await env.step(action)
+        print(f"Reward: {reward} | Done: {done}")
+
+asyncio.run(main())
+```
+
+### 🛰️ Live Dashboard
+Visit the **Interactive Dashboard** to see live drone telemetry and mission progress:
+- **Web UI**: [https://vj-ai27-hack-forge.hf.space/web](https://vj-ai27-hack-forge.hf.space/web)
+- **WebSocket**: `wss://vj-ai27-hack-forge.hf.space/ws` (for high-frequency agents)
+
+---
+
+## 🛠️ API Reference
 
 ### 🚀 Launching the Server
 The main entry point is the **root `app.py`**. Run it using:
