@@ -376,9 +376,12 @@ def dashboard():
             <div class="stat">Collisions: {s.get('collision_count', 0)}</div>
             <div class="stat">Battery Fails: {s.get('battery_failures', 0)}</div>
             <div class="stat">Score: {grade(s):.4f}</div>
+        """
+        
+    return f"""
     <html>
         <head>
-            <title>AeroSync AI Dashboard</title>
+            <title>Drone-env Dashboard</title>
             <style>
                 body {{ font-family: 'Inter', sans-serif; background: #0f172a; color: white; padding: 2rem; }}
                 .card {{ background: #1e293b; padding: 1.5rem; border-radius: 12px; border: 1px solid #334155; max-width: 600px; margin: auto; }}
@@ -392,7 +395,7 @@ def dashboard():
         </head>
         <body>
             <div class="card">
-                <h1>🚁 AeroSync AI <span class="badge">v{_VERSION}</span></h1>
+                <h1>🚁 Drone-env <span class="badge">v{_VERSION}</span></h1>
                 <div class="summary">{env_summary}</div>
                 <div class="metrics">
                     {metrics_block}

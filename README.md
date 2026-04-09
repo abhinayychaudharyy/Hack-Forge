@@ -1,5 +1,5 @@
 ---
-title: AeroSync AI
+title: Drone-env
 emoji: 🚁
 colorFrom: blue
 colorTo: indigo
@@ -15,7 +15,7 @@ tags:
 license: mit
 ---
 
-# AeroSync AI
+# Drone-env
 
 An [OpenEnv](https://huggingface.co/openenv)-compliant environment that simulates a **real-world warehouse-to-doorstep drone delivery pipeline**. Autonomous drones pick packages directly from warehouse shelves, fly through a 3D grid with altitude layers and wind physics, and deliver to customer locations.
 
@@ -23,7 +23,7 @@ An [OpenEnv](https://huggingface.co/openenv)-compliant environment that simulate
 
 ## Technical Concept: Drone-Only Logistics
 
-AeroSync AI focuses on the **Urban Air Mobility (UAM)** challenge:
+Drone-env focuses on the **Urban Air Mobility (UAM)** challenge:
 - **Top-Down Coordinate System**: 
   - (0,0) is Top-Left.
   - **SOUTH increases Y** (Down on grid).
@@ -48,7 +48,7 @@ graph TD
 
 ## Reward Engine & Scoring
 
-AeroSync AI provides **Meaningful Rewards** with dense partial progress signals:
+Drone-env provides **Meaningful Rewards** with dense partial progress signals:
 
 | Event | Reward | Description |
 |---|---|---|
@@ -68,7 +68,7 @@ At the end of each episode, the environment generates a **Detailed Grading Repor
 
 ## 🚀 Quick Start: Standard OpenEnv Access
 
-AeroSync AI supports the standard OpenEnv protocol for both synchronous and asynchronous agent interaction.
+Drone-env supports the standard OpenEnv protocol for both synchronous and asynchronous agent interaction.
 
 ### 📦 Installation
 Install the client package directly from this Space:
