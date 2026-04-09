@@ -218,11 +218,22 @@ def run_task(client: OpenAI, task_name: str, max_steps: int) -> Dict[str, Any]:
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("--task", default="easy")
-    p.add_argument("--max_steps", type=int, default=120)
+    p.add_argument("--task", default="all", help="Task to run (easy, medium, hard, or all)")
+    p.add_argument("--max_steps", type=int, default=0, help="Override max steps (uses config defaults if 0)")
     args = p.parse_args()
     if not API_KEY: sys.exit(1)
-    run_task(OpenAI(api_key=API_KEY, base_url=API_BASE_URL), args.task, args.max_steps)
+    
+    client = OpenAI(api_key=API_KEY, base_url=API_BASE_URL)
+    tasks_to_run = ["easy", "medium", "hard"] if args.task == "all" else [args.task]
+    
+    for t in tasks_to_run:
+        steps = args.max_steps
+        if steps == 0:
+            if t == "easy": steps = 120
+            elif t == "medium": steps = 250
+            elif t == "hard": steps = 500
+            else: steps = 120
+        run_task(client, t, steps)
 
 if __name__ == "__main__":
     main()
