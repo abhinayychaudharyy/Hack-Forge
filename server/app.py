@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse, HTMLResponse, RedirectResponse
 from pydantic import BaseModel, Field
 
-from env.aerosync_env import AeroSyncEnv
+from env.drone_env import DroneEnv
 from env.models import (
     AeroSyncAction, AeroSyncObservation,
     AgentType, EpisodeInfo, Position,
@@ -98,10 +98,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-_env: Optional[AeroSyncEnv] = None
+_env: Optional[DroneEnv] = None
 
 
-def _get_env() -> AeroSyncEnv:
+def _get_env() -> DroneEnv:
     global _env
     if _env is None:
         raise HTTPException(
@@ -227,7 +227,7 @@ async def reset(request: Request):
             detail=f"Unknown task '{task_name}'. Choose from: {list(TASK_CONFIGS.keys())}"
         )
     config = TASK_CONFIGS[task_name]()
-    _env  = AeroSyncEnv(config)
+    _env  = DroneEnv(config)
     obs   = _env.reset()
     return obs
 
@@ -301,7 +301,6 @@ def get_openenv_yaml():
     yaml_path = Path(__file__).parent.parent / "openenv.yaml"
     if yaml_path.exists():
         return yaml_path.read_text(encoding="utf-8")
-    # Fallback to root or current dir
     root_yaml = Path("openenv.yaml")
     if root_yaml.exists():
         return root_yaml.read_text(encoding="utf-8")
@@ -317,24 +316,22 @@ async def websocket_endpoint(websocket: WebSocket):
     Handles a full mission lifecycle (reset -> steps -> done).
     """
     await websocket.accept()
-    local_env: Optional[AeroSyncEnv] = None
+    local_env: Optional[DroneEnv] = None
     
     try:
         while True:
             data = await websocket.receive_json()
             
-            # 1. Handle Reset
             if data.get("type") == "reset":
                 task_name = data.get("task_name", "easy")
                 config = TASK_CONFIGS.get(task_name, easy_config)()
-                local_env = AeroSyncEnv(config)
+                local_env = DroneEnv(config)
                 obs = local_env.reset()
                 await websocket.send_json({
                     "type": "observation",
                     "observation": obs.model_dump()
                 })
                 
-            # 2. Handle Step
             elif data.get("type") == "step":
                 if local_env is None:
                     await websocket.send_json({"type": "error", "message": "Call reset first"})

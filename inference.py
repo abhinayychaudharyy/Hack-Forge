@@ -1,7 +1,3 @@
-"""
-AeroSync AI — Baseline Inference Script (Drone-Only)
-OpenEnv Hackathon compliant: structured [START]/[STEP]/[END] stdout logging.
-"""
 from __future__ import annotations
 import argparse
 import json
@@ -17,7 +13,7 @@ from openai import OpenAI
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from env.aerosync_env import AeroSyncEnv
+from env.drone_env import DroneEnv
 from env.models import AeroSyncAction, ActionType, Direction, TaskStatus
 from grader.grader import grade, detailed_report
 from tasks.easy   import get_config as easy_config
@@ -174,7 +170,7 @@ def run_task(client: OpenAI, task_name: str, max_steps: int) -> Dict[str, Any]:
     env = None
     try:
         config_fn = {"easy":easy_config,"medium":medium_config,"hard":hard_config}[task_name]()
-        env = AeroSyncEnv(config_fn)
+        env = DroneEnv(config_fn)
         obs = env.reset()
         obs_dict = obs.model_dump()
         conv = [{"role": "system", "content": build_system_prompt(task_name)}]

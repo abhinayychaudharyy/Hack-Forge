@@ -1,14 +1,3 @@
-"""
-AeroSync AI — Advanced Drone Delivery & Warehouse Robot Environment
-OpenEnv-compliant: reset() / step() / state()
-
-Advanced features:
-  - Rich drone flight physics (tilt, altitude, wind, payload drag)
-  - Multi-leg FlightWaypoint planning
-  - Obstacle proximity, TTC, near-miss tracking
-  - Full AeroSyncReward with 30+ components
-  - Grid map exposed in AeroSyncObservation
-"""
 from __future__ import annotations
 import copy
 import math
@@ -26,21 +15,12 @@ from env.models import (
 
 from typing import cast
 
-# ─────────────────────────────────────────────
-# TIER 1: The Core Mission (Scaled up massively)
-# ─────────────────────────────────────────────
-# ─────────────────────────────────────────────
-# TIER 1: The Core Mission (Meaningful Rewards)
-# ─────────────────────────────────────────────
 R_DELIVERY         =  1000.0  # Goal reached
 R_PICKUP           =   200.0  # Significant partial progress signal
 R_DISPATCH         =   100.0  
 P_COLLISION        = -1000.0  # Safety first
 P_BATTERY          =  -500.0  
 
-# ─────────────────────────────────────────────
-# TIER 2: Performance & Efficiency
-# ─────────────────────────────────────────────
 P_DELAY            =    -0.5  # Per-step penalty
 P_IDLE             =    -1.0  # Discourage idling
 B_PRECISION_DROP   =    50.0  
@@ -49,9 +29,6 @@ B_CLEAN_PATH       =    50.0
 B_OPTIMAL_PATH     =    50.0  
 B_WAYPOINT         =     5.0  
 
-# ─────────────────────────────────────────────
-# TIER 3: Safety Guardrails
-# ─────────────────────────────────────────────
 P_FORCED_LANDING   =  -200.0  
 P_HOVER_DRIFT      =    -2.0  
 P_OBSTACLE_NEAR    =    -5.0  
@@ -59,7 +36,6 @@ P_OBSTACLE_MISS    =   -20.0
 P_TTC_CRITICAL     =   -20.0  
 P_TTC_WARNING      =    -5.0  
 
-# Farming preventions (zeroed)
 B_HOVER_STABILITY  =     0.0  
 B_SAFE_CLEAR       =     0.0  
 B_TTC_SAFE         =     0.0  
@@ -68,7 +44,7 @@ B_COLLISION_AVOID  =     0.0
 P_YAW_THRASH       =    -5.0
 P_YAW_OVERSHOOT    =    -2.0
 
-class AeroSyncEnv:
+class DroneEnv:
     """
     AeroSync AI advanced logistics environment.
 
@@ -97,10 +73,8 @@ class AeroSyncEnv:
         ]
         self.wind_condition: WindCondition = WindCondition.MODERATE
 
-        # Build grid map once
         self._grid_map: Dict[str, GridCell] = self._build_grid_map()
 
-        # Mutable state
         self._step: int = 0
         self._agents: Dict[str, AgentState] = {}
         self._drone_states: Dict[str, DroneAgentState] = {}
@@ -109,12 +83,9 @@ class AeroSyncEnv:
         self._episode_rewards: List[float] = []
         self._collision_count: int = 0
         self._battery_failures: int = 0
-        # Per-drone episode tracking for clean path bonus
         self._drone_near_miss_steps: Dict[str, int] = {}
 
-    # ─────────────────────────────────────────────
     # OpenEnv API
-    # ─────────────────────────────────────────────
 
     def reset(self) -> AeroSyncObservation:
         """Reset environment to initial state. Returns first observation."""
@@ -125,7 +96,6 @@ class AeroSyncEnv:
         self._collision_count = 0
         self._battery_failures = 0
 
-        # Robots
         self._agents = {}
         for r in cfg.get("robots", []):
             self._agents[r["id"]] = AgentState(
@@ -135,7 +105,6 @@ class AeroSyncEnv:
                 battery=r.get("battery", 100.0),
             )
 
-        # ── Per-drone episode tracking — initialised ONCE before the loop ──
         self._drone_states: Dict[str, DroneAgentState] = {}
         self._drone_near_miss_steps: Dict[str, int] = {}
         self._drone_prev_yaw: Dict[str, float] = {}
@@ -159,19 +128,14 @@ class AeroSyncEnv:
                 flight=fp,
                 diagnostics=diag,
             )
-            # Per-drone entries — appended into existing dicts, not recreating them
             self._drone_near_miss_steps[d["id"]] = 0
             self._drone_prev_yaw[d["id"]] = 0.0
             self._prev_dist_dict[d["id"]] = 999.0
 
-        # Tasks — auto-dispatch into queue (drone-only mode, no robots)
-        # dispatch_location = where drone picks the parcel (pickup shelf or explicit dispatch pad)
-        # delivery_location = where drone delivers to customer
         self._tasks = {}
         for t in cfg.get("tasks", []):
             pickup_pos   = Position(**t["pickup"])
             delivery_pos = Position(**t["delivery"])
-            # Use explicit "dispatch" if provided, else use pickup as pickup+dispatch
             dispatch_raw = t.get("dispatch", t["pickup"])
             dispatch_pos = Position(**dispatch_raw)
             task = TaskState(
@@ -202,7 +166,6 @@ class AeroSyncEnv:
         agent.steps_taken += 1
         is_drone = agent.agent_type == AgentType.DRONE
 
-        # ── Dead battery ─────────────────────────────────────────────
         if agent.battery <= 0.0 and action.action_type != ActionType.CHARGE:
             if is_drone and agent.position.z > 0:
                 rb.forced_landing_penalty += P_FORCED_LANDING
@@ -217,13 +180,10 @@ class AeroSyncEnv:
             self._episode_rewards.append(total)
             return self._build_observation(total), total, self._is_done(), info
 
-        # ── Accept new flight plan ───────────────────────────────────
-        # ── Accept new flight plan ───────────────────────────────────
         _waypoints = getattr(action, "waypoints", None)
         if is_drone and _waypoints:
             self._accept_flight_plan(agent, _waypoints)
 
-        # ── Dispatch action ──────────────────────────────────────────
         act = action.action_type
         if act == ActionType.MOVE:
             rb, info = self._do_move(agent, action.direction, rb, info)
@@ -243,20 +203,15 @@ class AeroSyncEnv:
             self._do_charge(agent)
         elif act == ActionType.ASSIGN_TASK:
             self._do_assign(agent, action.task_id)
-        # WAIT — intentional no-op
 
-        # ── Drone diagnostics & rich rewards ────────────────────────
         if is_drone:
             rb, info = self._update_drone_step(agent, rb, info)
 
-        # ── Apply battery decay ──────────────────────────────────────
         self._apply_battery_decay(agent)
 
-        # ── Advance waypoint tracking ────────────────────────────────
         if is_drone:
             self._advance_waypoints(agent, info)
 
-        # ── Global penalties ─────────────────────────────────────────
         pending = sum(1 for t in self._tasks.values()
                       if t.status not in (TaskStatus.DELIVERED, TaskStatus.FAILED))
         rb.delay_penalty += P_DELAY * pending
@@ -306,9 +261,6 @@ class AeroSyncEnv:
             "grid": {"width": self.W, "height": self.H},
         }
 
-    # ─────────────────────────────────────────────
-    # Action Handlers
-    # ─────────────────────────────────────────────
 
     def _do_move(self, agent: AgentState, direction: Optional[str],
              rb: AeroSyncReward, info: EpisodeInfo) -> Tuple[AeroSyncReward, EpisodeInfo]:
@@ -335,7 +287,6 @@ class AeroSyncEnv:
             if (nx, ny) in self.obstacles:
                 return rb, info
 
-        # Collision check
         all_agents = list(self._agents.values()) + list(self._drone_states.values())
         for other in all_agents:
             if other.agent_id == agent.agent_id:
@@ -355,7 +306,6 @@ class AeroSyncEnv:
 
                 return rb, info
 
-        # Move
         agent.position = Position(x=nx, y=ny, z=nz)
         agent.is_idle = False
 
@@ -371,14 +321,12 @@ class AeroSyncEnv:
                   rb: AeroSyncReward, info: EpisodeInfo) -> Tuple[AeroSyncReward, EpisodeInfo]:
         agent.flight.flight_mode = FlightMode.HOVER
         agent.is_idle = False
-        # Stability based on proximity to grid centre and wind
         cx, cy = self.W / 2.0, self.H / 2.0
         dist = math.sqrt((agent.position.x - cx) ** 2 + (agent.position.y - cy) ** 2)
         wind_penalty = {WindCondition.CALM: 0.0, WindCondition.LIGHT: 0.05,
                         WindCondition.MODERATE: 0.1, WindCondition.STRONG: 0.2}.get(
             self.wind_condition, 0.0)
         agent.flight.hover_stability_score = max(0.0, 1.0 - 0.04 * dist - wind_penalty)
-        # Drift
         import random
         wf = {WindCondition.CALM: 0, WindCondition.LIGHT: 0.05,
               WindCondition.MODERATE: 0.1, WindCondition.STRONG: 0.2}.get(self.wind_condition, 0)
@@ -423,7 +371,6 @@ class AeroSyncEnv:
         agent.diagnostics.forced_rtb_count += 1
         if agent.battery > agent.flight.critical_battery_threshold:
             rb.efficient_rtb_bonus += B_EFFICIENT_RTB
-        # Move one step toward nearest charger
         if self.charging_positions:
             closest = min(self.charging_positions,
                           key=lambda c: abs(c.x - agent.position.x) + abs(c.y - agent.position.y))
@@ -459,11 +406,6 @@ class AeroSyncEnv:
                 info.message = f"{agent.agent_id} picked task {task_id}"
 
         elif agent.agent_type == AgentType.DRONE:
-            # Drone must descend to ground (z=0) at the task pick-up point.
-            # Accept any of:
-            #   1. A registered dispatch_zone (traditional warehouse → dispatch pad flow)
-            #   2. The task's explicit dispatch_location (explicit dispatch pad in config)
-            #   3. The task's pickup_location (drone-only: drone flies direct to shelf)
             at_dispatch_zone   = (ax, ay) in self.dispatch_zones
             at_task_dispatch   = (ax == task.dispatch_location.x and ay == task.dispatch_location.y)
             at_task_pickup     = (ax == task.pickup_location.x   and ay == task.pickup_location.y)
@@ -501,7 +443,6 @@ class AeroSyncEnv:
         elif agent.agent_type == AgentType.DRONE:
             if (task.status == TaskStatus.IN_FLIGHT and
                     ax == task.delivery_location.x and ay == task.delivery_location.y):
-                # Must be on ground (descended) for delivery
                 if az == 0:
                     prec = agent.flight.hover_stability_score
                     if prec >= agent.flight.delivery_precision_threshold:
@@ -514,7 +455,6 @@ class AeroSyncEnv:
                         agent.diagnostics.total_deliveries += 1
                         rb.delivery_bonus += R_DELIVERY
                         rb.precision_landing_bonus += B_PRECISION_DROP * prec
-                        # Check clean path
                         if self._drone_near_miss_steps.get(agent.agent_id, 0) == 0:
                             rb.clean_path_completion_bonus += B_CLEAN_PATH
                             info.clean_path_drones.append(agent.agent_id)
@@ -557,16 +497,12 @@ class AeroSyncEnv:
             task.assigned_robot = agent.agent_id
             agent.is_idle = False
 
-    # ─────────────────────────────────────────────
-    # Drone Step — Physics, Diagnostics & Rich Rewards
-    # ─────────────────────────────────────────────
 
     def _update_drone_step(self, drone: DroneAgentState,
                        rb: AeroSyncReward, info: EpisodeInfo) -> Tuple[AeroSyncReward, EpisodeInfo]:
         diag = drone.diagnostics
         fp = drone.flight
 
-        # ── 1. Distance to nearest obstacle ───────────────────────────
         min_dist = 999.0
         for ox, oy in self.obstacles:
             d = abs(ox - drone.position.x) + abs(oy - drone.position.y)
@@ -576,7 +512,6 @@ class AeroSyncEnv:
         diag.obstacle_detected = min_dist <= 1.5
         diag.collision_risk = max(0.0, min(1.0, 1.0 - min_dist / 5.0))
 
-        # ── 2. Proximity guardrails (distance-based, always fires) ────
         if min_dist < 1.0:
             rb.obstacle_near_miss_penalty += P_OBSTACLE_MISS
             if drone.agent_id not in info.obstacle_near_misses:
@@ -589,7 +524,6 @@ class AeroSyncEnv:
         elif min_dist > 3.0:
             rb.safe_clearance_bonus += B_SAFE_CLEAR
 
-        # ── 3. TTC — closing speed based, no double-fire with proximity ─
         prev_dist = self._prev_dist_dict.get(drone.agent_id, 999.0)
         closing_speed = prev_dist - min_dist
         self._prev_dist_dict[drone.agent_id] = min_dist
@@ -599,7 +533,6 @@ class AeroSyncEnv:
             inv_ttc = min(1.0 / ttc, 5.0)
 
             if ttc < 1.0 and min_dist >= 1.0:
-                # Critical but proximity block didn't already fire
                 rb.ttc_critical_penalty += P_TTC_CRITICAL * inv_ttc
                 if drone.agent_id not in info.obstacle_near_misses:
                     info.obstacle_near_misses.append(drone.agent_id)
@@ -608,16 +541,12 @@ class AeroSyncEnv:
             else:
                 rb.ttc_safe_bonus += B_TTC_SAFE  # 0.0, safe to keep
         else:
-            # Drone moving away — reward active evasion
             if prev_dist < 3.0:
                 rb.collision_avoidance_bonus += B_COLLISION_AVOID
 
-        # ── 4. High speed near obstacle ───────────────────────────────
         if fp.current_speed > 1.5 and min_dist < 3.0:
             rb.high_speed_near_obstacle_penalty += -2.0
 
-        # ── 5. Tilt penalties ─────────────────────────────────────────
-        # ── 5. Tilt penalties ─────────────────────────────────────────
         tilt = getattr(fp, "tilt", None) or DroneTiltState()
         if abs(tilt.pitch) > tilt.max_pitch or abs(tilt.roll) > tilt.max_roll:
             rb.over_tilt_penalty += -2.0
@@ -626,7 +555,6 @@ class AeroSyncEnv:
         if tilt.is_banking and fp.flight_mode != FlightMode.CRUISE:
             rb.unnecessary_banking_penalty += -1.0
 
-        # ── 6. Yaw — penalty only, no farming ────────────────────────
         prev_yaw = self._drone_prev_yaw.get(drone.agent_id, tilt.yaw)
         yaw_delta = abs(tilt.yaw - prev_yaw)
         yaw_delta = min(yaw_delta, 360.0 - yaw_delta) if yaw_delta > 180 else yaw_delta
@@ -641,15 +569,11 @@ class AeroSyncEnv:
 
         self._drone_prev_yaw[drone.agent_id] = tilt.yaw
 
-        # ── 7. Battery RTB nudge ──────────────────────────────────────
         if drone.battery <= fp.low_battery_threshold and fp.flight_mode != FlightMode.RETURN:
             info.drone_rtb_events.append(f"{drone.agent_id}:low_battery_warning")
 
         return rb, info
 
-    # ─────────────────────────────────────────────
-    # Battery Decay
-    # ─────────────────────────────────────────────
 
     def _apply_battery_decay(self, agent: AgentState):
         if agent.is_charging:
@@ -671,9 +595,6 @@ class AeroSyncEnv:
         else:
             agent.battery = max(0.0, agent.battery - 0.3)
 
-    # ─────────────────────────────────────────────
-    # Flight Plan Management
-    # ─────────────────────────────────────────────
 
     def _accept_flight_plan(self, drone: DroneAgentState, waypoints: List[FlightWaypoint]):
         """Validate and store a new flight plan submitted via AeroSyncAction.waypoints."""
@@ -683,7 +604,6 @@ class AeroSyncEnv:
             total_estimated_battery=sum(w.estimated_battery_cost for w in waypoints),
             total_estimated_steps=len(waypoints),
         )
-        # Validate each waypoint
         for wp in plan.waypoints:
             if (wp.position.x, wp.position.y) in self.obstacles:
                 wp.was_blocked = True
@@ -706,9 +626,6 @@ class AeroSyncEnv:
             wp.arrival_was_clean = wp.obstacle_dist_on_arrival > 2.0 and not wp.was_blocked
             plan.current_waypoint_idx += 1
 
-    # ─────────────────────────────────────────────
-    # Helpers
-    # ─────────────────────────────────────────────
 
     def _is_done(self) -> bool:
         if self._step >= self.max_steps:
@@ -754,7 +671,6 @@ class AeroSyncEnv:
         obs_agents = {k: AgentState(**v.model_dump()) for k, v in self._agents.items()}
         obs_drones = {k: DroneAgentState(**v.model_dump()) for k, v in self._drone_states.items()}
 
-        # Update occupants in grid
         grid_snap = copy.copy(self._grid_map)
         for cell in grid_snap.values():
             cell.occupant_id = None

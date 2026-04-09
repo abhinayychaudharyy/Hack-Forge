@@ -1,21 +1,8 @@
-"""
-AeroSync AI — Hard Task Grader
-================================
-Difficulty: 3 / 3
-Weights: completion=0.35, efficiency=0.18, safety=0.22, priority=0.15, drone_quality=0.10
-
-Safety is weighted highest here — collision avoidance and battery management
-are the primary challenge on the hard task.
-
-Entrypoint expected by openenv.yaml:
-    grade(state: dict) -> float  in [0.0, 1.0]
-"""
 from __future__ import annotations
 from typing import Any, Dict
 
 from env.models import TaskStatus
 
-# ─── Grading weights ──────────────────────────────────────────────────────────
 _WEIGHTS = {
     "completion_weight": 0.35,
     "efficiency_weight": 0.18,
@@ -24,7 +11,6 @@ _WEIGHTS = {
     "drone_weight":      0.10,
 }
 
-# ─── Penalty magnitudes ───────────────────────────────────────────────────────
 _COLLISION_HIT      = 0.10
 _BATTERY_FAIL_HIT   = 0.15
 _FORCED_RTB_HIT     = 0.05
@@ -32,7 +18,6 @@ _NEAR_MISS_HIT      = 0.03
 _MOTOR_DEGRADED_HIT = 0.10
 
 
-# ─── Helpers ─────────────────────────────────────────────────────────────────
 
 def _delivered_set(tasks: Dict[str, Any]) -> list:
     return [
@@ -95,7 +80,6 @@ def _drone_quality_score(state: Dict[str, Any]) -> float:
     return round(float(max(0.0, 1.0 - deduction)), 4)
 
 
-# ─── Public API ───────────────────────────────────────────────────────────────
 
 def grade(state: Dict[str, Any]) -> float:
     """
@@ -111,20 +95,16 @@ def grade(state: Dict[str, Any]) -> float:
     if not tasks:
         return 0.0
 
-    # 1. Completion ratio
     total_tasks      = len(tasks)
     delivered        = len(_delivered_set(tasks))
     completion_ratio = delivered / total_tasks
 
-    # 2. Priority-weighted completion
     priority_score = _priority_score(tasks)
 
-    # 3. Efficiency
     steps_used       = state.get("step",      1)
     max_steps        = state.get("max_steps", 1)
     efficiency_ratio = max(0.0, 1.0 - (steps_used / max_steps) * 0.5) if max_steps > 0 else 0.5
 
-    # 4. Safety (highest weight on hard)
     collisions       = state.get("collision_count",  0)
     battery_failures = state.get("battery_failures", 0)
     forced_rtb       = sum(
@@ -143,10 +123,8 @@ def grade(state: Dict[str, Any]) -> float:
     )
     safety_factor = max(0.0, 1.0 - safety_deduction)
 
-    # 5. Drone quality
     drone_score = _drone_quality_score(state)
 
-    # 6. Weighted sum
     score = (
         _WEIGHTS["completion_weight"] * completion_ratio
         + _WEIGHTS["efficiency_weight"] * efficiency_ratio

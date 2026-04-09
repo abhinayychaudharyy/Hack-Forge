@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 
 from env.models import AeroSyncAction, AeroSyncObservation, AgentType
 
-class AeroSyncEnv:
+class DroneEnv:
     """
     Standard OpenEnv Client for AeroSync AI.
     Provides easy access to the environment via HTTP and WebSocket.
@@ -31,14 +31,12 @@ class AeroSyncEnv:
 
     async def reset(self, task_name: str = "easy") -> AeroSyncObservation:
         """Initialize or reset the environment."""
-        # Use HTTP for stateless reset
         response = await self._http.post("/reset", json={"task_name": task_name})
         response.raise_for_status()
         return AeroSyncObservation(**response.json())
 
     async def step(self, action: AeroSyncAction) -> tuple[AeroSyncObservation, float, bool, Dict[str, Any]]:
         """Execute one step in the environment."""
-        # Use HTTP for stateless step
         response = await self._http.post("/step", json=action.model_dump())
         response.raise_for_status()
         data = response.json()
@@ -96,8 +94,8 @@ class AeroSyncEnv:
 
 
 class AeroSyncSyncClient:
-    """Sync wrapper for AeroSyncEnv."""
-    def __init__(self, async_client: AeroSyncEnv):
+    """Sync wrapper for DroneEnv."""
+    def __init__(self, async_client: DroneEnv):
         self._async = async_client
         self._loop = asyncio.get_event_loop()
 

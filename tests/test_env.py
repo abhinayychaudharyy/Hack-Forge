@@ -1,15 +1,8 @@
-"""
-AeroSync AI — Test Suite (Drone-Only)
-Validates OpenEnv compliance: reset(), step(), state(), graders, models,
-drone-specific actions, rich reward components, and grid map.
-
-Run: python -m pytest tests/test_env.py -v
-"""
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pytest
-from env.aerosync_env import AeroSyncEnv
+from env.drone_env import DroneEnv
 from env.models import (
     AeroSyncAction, AeroSyncObservation, AeroSyncReward,
     DroneAgentState, AgentType, TaskStatus, FlightMode,
@@ -21,32 +14,27 @@ from tasks.medium import get_config as medium_config
 from tasks.hard   import get_config as hard_config
 
 
-# ─────────────────────────────────────────────
-# Fixtures
-# ─────────────────────────────────────────────
 
 @pytest.fixture
 def easy_env():
-    env = AeroSyncEnv(easy_config())
+    env = DroneEnv(easy_config())
     env.reset()
     return env
 
 @pytest.fixture
 def medium_env():
-    env = AeroSyncEnv(medium_config())
+    env = DroneEnv(medium_config())
     env.reset()
     return env
 
 @pytest.fixture
 def hard_env():
-    env = AeroSyncEnv(hard_config())
+    env = DroneEnv(hard_config())
     env.reset()
     return env
 
 
-# ─────────────────────────────────────────────
 # OpenEnv API Compliance
-# ─────────────────────────────────────────────
 
 class TestOpenEnvAPI:
 
@@ -64,7 +52,6 @@ class TestOpenEnvAPI:
         assert "drone_states" in s
 
     def test_step_returns_tuple(self, easy_env):
-        # Use drone_0 for easy task
         action = AeroSyncAction(agent_id="drone_0", action_type=ActionType.WAIT)
         obs, reward, done, info = easy_env.step(action)
         assert isinstance(obs, AeroSyncObservation)
@@ -99,9 +86,6 @@ class TestOpenEnvAPI:
         assert isinstance(drone, DroneAgentState)
 
 
-# ─────────────────────────────────────────────
-# Typed Models
-# ─────────────────────────────────────────────
 
 class TestTypedModels:
 
@@ -136,9 +120,6 @@ class TestTypedModels:
         assert hasattr(drone.diagnostics, "nearest_obstacle_dist")
 
 
-# ─────────────────────────────────────────────
-# Task Configs
-# ─────────────────────────────────────────────
 
 class TestTaskConfigs:
 
@@ -160,9 +141,6 @@ class TestTaskConfigs:
                 assert t["delivery"].get("z", 0) == 0
 
 
-# ─────────────────────────────────────────────
-# Drone Mechanics
-# ─────────────────────────────────────────────
 
 class TestDroneMechanics:
 
@@ -201,14 +179,11 @@ class TestDroneMechanics:
 
     def test_drone_rtb_fires_rtb_event(self, easy_env):
         easy_env.reset()
-        # Drain battery to force RTB or just call action
         _, _, _, info = easy_env.step(AeroSyncAction(agent_id="drone_0", action_type=ActionType.RETURN_TO_BASE))
-        # RTB event is added to drone_rtb_events list in EpisodeInfo
         assert "drone_0" in info.drone_rtb_events
 
     def test_drone_pick_works_on_ground(self, easy_env):
         easy_env.reset()
-        # Move to pickup location and descend
         task = easy_env._tasks["task_0"]
         drone = easy_env._drone_states["drone_0"]
         drone.position.x = task.pickup_location.x
@@ -220,9 +195,6 @@ class TestDroneMechanics:
         assert task.status == TaskStatus.IN_FLIGHT
 
 
-# ─────────────────────────────────────────────
-# Reward & Grader
-# ─────────────────────────────────────────────
 
 class TestRewardAndGrader:
 
@@ -232,7 +204,7 @@ class TestRewardAndGrader:
 
     def test_score_in_range(self):
         for get_cfg in [easy_config, medium_config, hard_config]:
-            env = AeroSyncEnv(get_cfg())
+            env = DroneEnv(get_cfg())
             env.reset()
             env.step(AeroSyncAction(agent_id=list(env._drone_states.keys())[0], action_type=ActionType.WAIT))
             s = grade(env.state())
@@ -255,16 +227,12 @@ class TestRewardAndGrader:
         assert s > 0.7
 
 
-# ─────────────────────────────────────────────
-# BFS Pathfinder
-# ─────────────────────────────────────────────
 
 class TestBFS:
 
     def test_bfs_finds_path(self, easy_env):
         start = Position(x=0, y=0)
         goal  = Position(x=3, y=3)
-        # Needs agent_type
         path = easy_env.bfs_path(start, goal, agent_type=AgentType.DRONE)
         assert len(path) > 0
         assert len(path) == 6  # Manhattan distance

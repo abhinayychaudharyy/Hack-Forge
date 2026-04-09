@@ -21,7 +21,6 @@ tags:
 author: AeroSync AI Team
 license: MIT
 
-# ── Task Registry ──────────────────────────────────────────
 tasks:
   - name: easy
     description: "2 drones, 2 deliveries. Open 10x10 grid, no obstacles, full battery — learn the pick-hover-place pipeline."
@@ -72,7 +71,6 @@ tasks:
 
     expected_score_random: 0.05
     expected_score_baseline: 0.22
-# ── Observation Space ──────────────────────────────────────
 observation_space:
   type: AeroSyncObservation
   fields:
@@ -89,7 +87,6 @@ observation_space:
     done:              "bool — episode terminated"
     metrics:           "Dict[str, float] — live KPIs (completion_rate, collisions, battery_failures...)"
 
-# ── Action Space ───────────────────────────────────────────
 action_space:
   type: AeroSyncAction
   fields:
@@ -101,29 +98,23 @@ action_space:
     flight_mode_override: "optional FlightMode — force drone flight mode this step"
     waypoints:            "optional List[FlightWaypoint] — submit a full flight plan"
 
-# ── Reward Function ────────────────────────────────────────
 reward:
-  # Core
   delivery_bonus:          +20.0
   dispatch_bonus:          +10.0
   pickup_bonus:             +5.0
   collision_penalty:       -30.0
   battery_penalty:         -50.0
-  delay_penalty:           -0.05   # per pending task per step
-  idle_penalty:            -0.02   # per idle agent per step
-  # Drone precision
-  precision_landing_bonus:  +5.0   # scaled by hover_stability_score
+  delay_penalty:           -0.05  
+  idle_penalty:            -0.02  
+  precision_landing_bonus:  +5.0  
   forced_landing_penalty:  -20.0
-  efficient_rtb_bonus:      +5.0   # return before critical threshold
-  # Obstacle avoidance
-  obstacle_near_miss:       -8.0   # < 1 cell clearance
-  obstacle_proximity:       -3.0   # < 2 cells clearance
-  safe_clearance_bonus:     +0.5   # > 3 cells clearance each step
-  ttc_critical_penalty:    -10.0   # time-to-collision < 1 step
-  # Path quality
-  clean_path_bonus:        +10.0   # full delivery with zero near-miss events
+  efficient_rtb_bonus:      +5.0  
+  obstacle_near_miss:       -8.0  
+  obstacle_proximity:       -3.0  
+  safe_clearance_bonus:     +0.5  
+  ttc_critical_penalty:    -10.0  
+  clean_path_bonus:        +10.0  
 
-# ── Grading ────────────────────────────────────────────────
 grading:
   score_range: [0.0, 1.0]
   deterministic: true
@@ -138,7 +129,6 @@ grading:
     medium: {completion: 0.45, efficiency: 0.18, safety: 0.17, priority: 0.10, drone_quality: 0.10}
     hard:   {completion: 0.35, efficiency: 0.18, safety: 0.22, priority: 0.15, drone_quality: 0.10}
 
-# ── API Endpoints ──────────────────────────────────────────
 api:
   reset:   "POST /reset   — body: {task_name: easy|medium|hard}"
   step:    "POST /step    — body: AeroSyncAction JSON"
@@ -149,7 +139,6 @@ api:
   health:  "GET  /health"
   tasks:   "GET  /tasks"
 
-# ── Runtime ────────────────────────────────────────────────
 runtime:
   framework: fastapi
   port: 7860

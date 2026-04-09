@@ -79,11 +79,11 @@ pip install git+https://huggingface.co/spaces/abhinayychaudharyy/aerosync-ai
 ### 🤖 Basic Usage (Python Client)
 ```python
 import asyncio
-from client import AeroSyncEnv, AeroSyncAction
+from client import DroneEnv, AeroSyncAction
 
 async def main():
     # 1. Connect to the Space (Async)
-    async with AeroSyncEnv(base_url="https://abhinayychaudharyy-aerosync-ai.hf.space") as env:
+    async with DroneEnv(base_url="https://abhinayychaudharyy-aerosync-ai.hf.space") as env:
         # 2. Reset the environment
         obs = await env.reset(task_name="easy")
         print(f"Mission Start at Step {obs.step}")

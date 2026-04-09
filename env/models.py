@@ -1,7 +1,3 @@
-"""
-AeroSync AI - Typed Pydantic Models
-OpenEnv compliant: Observation, Action, Reward
-"""
 from __future__ import annotations
 from typing import Dict, List, Optional
 from enum import Enum
@@ -63,9 +59,6 @@ class WindCondition(str, Enum):
     STRONG   = "strong"    # 30+ km/h — high instability, may abort
 
 
-# ─────────────────────────────────────────────
-# Core Primitives
-# ─────────────────────────────────────────────
 
 class Position(BaseModel):
     x: int = Field(..., description="X coordinate on grid")
@@ -109,9 +102,6 @@ class GridCell(BaseModel):
     occupant_id: Optional[str]  = None
 
 
-# ─────────────────────────────────────────────
-# Drone Attitude & Path Planning Models
-# ─────────────────────────────────────────────
 
 class DroneTiltState(BaseModel):
     """Pitch / Roll / Yaw of drone body frame — drives diagonal movement"""
@@ -169,9 +159,6 @@ class DroneFlightPath(BaseModel):
     replanned_count: int            = Field(0, ge=0,   description="Times inference.py re-routed mid-mission")
 
 
-# ─────────────────────────────────────────────
-# Drone Flight Physics & Battery Models
-# ─────────────────────────────────────────────
 
 class DroneFlightParams(BaseModel):
     """
@@ -179,14 +166,12 @@ class DroneFlightParams(BaseModel):
     policy make battery-aware, stability-aware routing decisions.
     """
 
-    # ── Movement ──────────────────────────────────────────────────────
     max_speed: float              = Field(2.0,  ge=0.1, le=10.0, description="Max cells/step in CRUISE mode")
     current_speed: float          = Field(0.0,  ge=0.0, le=10.0, description="Actual speed this step")
     altitude: int                 = Field(1,    ge=0,   le=5,     description="Current altitude layer (0=ground, 5=max)")
     max_altitude: int             = Field(5,    ge=1,   le=10,    description="Hard ceiling for this drone model")
     flight_mode: FlightMode       = Field(FlightMode.CRUISE,      description="Current flight behaviour mode")
 
-    # ── Battery ───────────────────────────────────────────────────────
     battery_capacity: float       = Field(100.0, ge=1.0,           description="Full-charge capacity (normalised to 100)")
     battery_drain_per_move: float = Field(1.5,   ge=0.0,           description="% battery per MOVE step")
     battery_drain_hover: float    = Field(2.5,   ge=0.0,           description="% battery per HOVER step")
@@ -197,7 +182,6 @@ class DroneFlightParams(BaseModel):
     charge_rate_per_step: float   = Field(5.0,   ge=0.1,           description="% battery recovered per step docked")
     estimated_steps_remaining: int = Field(0,    ge=0,             description="Steps left before forced RTB")
 
-    # ── Hover Stability ───────────────────────────────────────────────
     hover_stability_score: float  = Field(1.0, ge=0.0, le=1.0, description="1.0=perfectly stable, 0.0=uncontrolled")
     hover_drift_x: float          = Field(0.0, description="Lateral drift on X this step (cells)")
     hover_drift_y: float          = Field(0.0, description="Lateral drift on Y this step (cells)")
@@ -206,7 +190,6 @@ class DroneFlightParams(BaseModel):
     wind_condition: WindCondition = Field(WindCondition.CALM, description="Current wind level")
     wind_drag_factor: float       = Field(1.0, ge=1.0, le=3.0, description="Battery drain multiplier from wind")
 
-    # ── Payload & Delivery ────────────────────────────────────────────
     max_payload_kg: float               = Field(2.0,  ge=0.1, le=20.0, description="Max carry weight in kg")
     current_payload_kg: float           = Field(0.0,  ge=0.0,           description="Weight currently being carried")
     payload_drag_factor: float          = Field(1.0,  ge=1.0, le=2.0,  description="Battery drain multiplier from payload")
@@ -215,7 +198,6 @@ class DroneFlightParams(BaseModel):
     delivery_attempts: int              = Field(0,    ge=0,             description="Drop attempts for current task")
     max_delivery_attempts: int          = Field(3,    ge=1,             description="Max attempts before FAILED")
 
-    # ── Routing & Path ────────────────────────────────────────────────
     planned_path: List[Position]  = Field(default_factory=list, description="Legacy waypoints list")
     flight_plan: Optional[DroneFlightPath] = Field(None,        description="Rich structured flight plan")
     tilt: DroneTiltState          = Field(default_factory=DroneTiltState, description="Current attitude")
@@ -241,9 +223,6 @@ class DroneDiagnostics(BaseModel):
     near_miss_count: int         = Field(0,    ge=0,   description="Cumulative steps with nearest_obstacle_dist < 1.0")
 
 
-# ─────────────────────────────────────────────
-# Enhanced AgentState for Drones
-# ─────────────────────────────────────────────
 
 class DroneAgentState(AgentState):
     """
@@ -256,9 +235,7 @@ class DroneAgentState(AgentState):
     diagnostics: DroneDiagnostics = Field(..., description="Live telemetry for this drone")
 
 
-# ─────────────────────────────────────────────
 # OpenEnv Core Models
-# ─────────────────────────────────────────────
 
 class AeroSyncObservation(BaseModel):
     """Full observation returned by reset() and step()"""
@@ -303,7 +280,6 @@ class AeroSyncAction(BaseModel):
 class AeroSyncReward(BaseModel):
     """Detailed reward breakdown (returned inside info dict)"""
 
-    # ── Core ──────────────────────────────────────────────────────────
     total: float               = Field(0.0)
     delivery_bonus: float      = Field(0.0)
     dispatch_bonus: float      = Field(0.0)
@@ -313,49 +289,41 @@ class AeroSyncReward(BaseModel):
     delay_penalty: float       = Field(0.0)
     idle_penalty: float        = Field(0.0)
 
-    # ── Hover Stability ───────────────────────────────────────────────
     hover_stability_bonus: float        = Field(0.0, description="Bonus when hover_stability_score > threshold during delivery hold")
     hover_stability_loss_penalty: float = Field(0.0, description="Penalty every step stability drops below threshold while airborne")
     hover_drift_penalty: float          = Field(0.0, description="Penalty proportional to abs(drift_x)+abs(drift_y)+abs(drift_z) while hovering")
 
-    # ── Tilt / Banking ────────────────────────────────────────────────
     tilt_efficiency_bonus: float           = Field(0.0, description="Bonus for using minimum tilt needed to complete a turn")
     over_tilt_penalty: float               = Field(0.0, description="Penalty when abs(pitch) or abs(roll) exceeds model limits")
     unnecessary_banking_penalty: float     = Field(0.0, description="Penalty for is_banking=True when no direction change needed")
     tilt_stability_loss_penalty: float     = Field(0.0, description="Penalty equal to tilt_stability_cost each step")
     smooth_yaw_bonus: float                = Field(0.0, description="Bonus for reaching target yaw in minimum yaw steps")
 
-    # ── Precision Landing ─────────────────────────────────────────────
     precision_landing_bonus: float  = Field(0.0, description="Bonus scaled to delivery_precision on successful drop")
     imprecise_drop_penalty: float   = Field(0.0, description="Penalty when delivery_precision < threshold")
     repeated_attempt_penalty: float = Field(0.0, description="Penalty per extra delivery attempt beyond the first")
 
-    # ── Battery Efficiency ────────────────────────────────────────────
     efficient_rtb_bonus: float          = Field(0.0, description="Bonus for returning before critical_battery_threshold")
     forced_landing_penalty: float       = Field(0.0, description="Penalty for emergency/forced landing mid-mission")
     battery_conservation_bonus: float   = Field(0.0, description="Bonus for completing full delivery+RTB using < 60% battery")
     unnecessary_hover_penalty: float    = Field(0.0, description="Penalty for hovering more steps than hover_steps allows")
 
-    # ── Path & Movement Quality ───────────────────────────────────────
     optimal_path_bonus: float       = Field(0.0, description="Bonus if actual steps_taken <= total_estimated_steps")
     replanning_penalty: float       = Field(0.0, description="Penalty per replanned_count increment")
     waypoint_reached_bonus: float   = Field(0.0, description="Small bonus each time drone reaches a FlightWaypoint cleanly")
     speed_efficiency_bonus: float   = Field(0.0, description="Bonus for smart speed control near drop zones")
 
-    # ── Obstacle Avoidance (Distance-based) ───────────────────────────
     obstacle_proximity_penalty: float = Field(0.0, description="Penalty when nearest_obstacle_dist < 2.0 cells")
     obstacle_near_miss_penalty: float = Field(0.0, description="Larger penalty when nearest_obstacle_dist < 1.0 cell")
     safe_clearance_bonus: float       = Field(0.0, description="Bonus each step drone maintains nearest_obstacle_dist > 3.0")
     collision_avoidance_bonus: float  = Field(0.0, description="Bonus when obstacle_detected but drone reroutes successfully")
 
-    # ── Obstacle Avoidance (TTC — Time To Collision) ──────────────────
     ttc_critical_penalty: float                  = Field(0.0, description="Penalty when TTC < 1.0 step")
     ttc_warning_penalty: float                   = Field(0.0, description="Penalty when TTC < 2.0 steps")
     ttc_safe_bonus: float                        = Field(0.0, description="Bonus each step TTC > 5.0")
     high_speed_near_obstacle_penalty: float      = Field(0.0, description="Penalty when current_speed > 1.5 AND obstacle_dist < 3.0")
     speed_reduction_near_obstacle_bonus: float   = Field(0.0, description="Bonus for proactively reducing speed near obstacles")
 
-    # ── Waypoint + Obstacle Interaction ──────────────────────────────
     waypoint_obstacle_clear_bonus: float  = Field(0.0, description="Bonus when drone reaches waypoint AND obstacle_dist > 2.0")
     waypoint_obstacle_penalty: float      = Field(0.0, description="Penalty when drone reaches waypoint BUT obstacle_dist < 1.5")
     blocked_waypoint_penalty: float       = Field(0.0, description="Penalty when a planned waypoint is inside/adjacent to an obstacle")
@@ -371,7 +339,6 @@ class EpisodeInfo(BaseModel):
     completed_tasks: List[str]          = Field(default_factory=list)
     message: str                        = Field("")
 
-    # Drone diagnostics summary
     drone_rtb_events: List[str]         = Field(default_factory=list,
                                                 description="Drone IDs that triggered RTB this step")
     drone_precision_failures: List[str] = Field(default_factory=list,
@@ -379,7 +346,6 @@ class EpisodeInfo(BaseModel):
     drone_stability_warnings: List[str] = Field(default_factory=list,
                                                 description="Drone IDs below stability_threshold this step")
 
-    # Obstacle episode tracking
     obstacle_near_misses: List[str]    = Field(default_factory=list,
                                                description="Drone IDs with nearest_obstacle_dist < 1.0 this step")
     obstacle_forced_replans: List[str] = Field(default_factory=list,
