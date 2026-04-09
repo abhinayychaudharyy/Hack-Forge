@@ -38,6 +38,7 @@ async def lifespan(app: FastAPI):
         cfg = config_fn()
         params = GRADE_PARAMS.get(task_name, GRADE_PARAMS["easy"])
         _TASK_METADATA[task_name] = {
+            "id":          task_name,
             "name":        task_name,
             "description": _task_description(task_name, cfg),
             "difficulty":  {"easy": 1, "medium": 2, "hard": 3}[task_name],
@@ -50,7 +51,7 @@ async def lifespan(app: FastAPI):
             "grid":        {"width": cfg["grid_width"], "height": cfg["grid_height"]},
             "dispatch_zones": len(cfg.get("dispatch_zones", [])),
             "has_grader": True,
-            "grader": True,
+            "grader": f"grader.{task_name}:grade",
             "grading_weights": {
                 "completion":    params["completion_weight"],
                 "efficiency":    params["efficiency_weight"],
@@ -182,6 +183,7 @@ def list_tasks():
         cfg    = config_fn()
         params = GRADE_PARAMS.get(name, GRADE_PARAMS["easy"])
         tasks_out.append({
+            "id":          name,
             "name":        name,
             "description": _task_description(name, cfg),
             "difficulty":  {"easy": 1, "medium": 2, "hard": 3}[name],
@@ -194,7 +196,7 @@ def list_tasks():
             "grid":        {"width": cfg["grid_width"], "height": cfg["grid_height"]},
             "dispatch_zones": len(cfg.get("dispatch_zones", [])),
             "has_grader": True,
-            "grader": True,
+            "grader": f"grader.{name}:grade",
             "grading_weights": {
                 "completion":    params["completion_weight"],
                 "efficiency":    params["efficiency_weight"],
