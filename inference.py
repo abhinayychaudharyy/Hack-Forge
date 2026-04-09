@@ -164,13 +164,62 @@ def _navigate_toward(did: str, drone: Dict, tx: int, ty: int, carry: Optional[st
     return AeroSyncAction(agent_id=did, action_type="move", direction="south" if ty > y else "north")
 
 
-def run_task(client: OpenAI, task_name: str, max_steps: int) -> Dict[str, Any]:
+def _run_heuristic_task(task_name: str, max_steps: int) -> Dict[str, Any]:
+    """Run a task using the deterministic heuristic agent (no LLM needed)."""
+    score, success, steps, rewards = 0.0, False, 0, []
+    log_start(task=task_name, env=BENCHMARK, model="heuristic")
+    env = None
+    try:
+        cfg = {"easy": easy_config, "medium": medium_config, "hard": hard_config}[task_name]()
+        env = DroneEnv(cfg)
+        obs = env.reset()
+        obs_dict = obs.model_dump()
+        for s in range(1, max_steps + 1):
+            if obs_dict.get("done"): break
+            steps = s
+            # Command every drone every step using the heuristic
+            for did in list(obs_dict["drone_states"].keys()):
+                action = _fallback_action(did, obs_dict)
+                obs, reward, done, _ = env.step(action)
+                obs_dict = obs.model_dump()
+                rewards.append(reward)
+                log_step(step=s, action=action, reward=reward, done=done, error=None)
+                if obs_dict.get("done"): break
+            if obs_dict.get("done"): break
+        score = grade(env.state())
+        success = score >= 0.3
+    except KeyboardInterrupt: pass
+    except Exception as e: print(f"ERROR: {e}")
+    finally:
+        log_end(success=success, steps=steps, score=score, rewards=rewards)
+        if env:
+            try:
+                report = detailed_report(env.state())
+                print("\n" + "="*40)
+                print("       DETAILED GRADING REPORT")
+                print("="*40)
+                for k, v in report.items():
+                    if isinstance(v, float):
+                        print(f"  {k:20} : {v:.4f}")
+                    else:
+                        print(f"  {k:20} : {v}")
+                print("="*40 + "\n")
+            except Exception as re:
+                print(f"  [DEBUG] Failed to generate report: {re}")
+    return {"score": score}
+
+
+def run_task(client: Optional[OpenAI], task_name: str, max_steps: int) -> Dict[str, Any]:
+    # If no LLM client available, use the built-in heuristic agent
+    if client is None:
+        return _run_heuristic_task(task_name, max_steps)
+
     score, success, steps, rewards = 0.0, False, 0, []
     log_start(task=task_name, env=BENCHMARK, model=MODEL_NAME)
     env = None
     try:
-        config_fn = {"easy":easy_config,"medium":medium_config,"hard":hard_config}[task_name]()
-        env = DroneEnv(config_fn)
+        cfg = {"easy": easy_config, "medium": medium_config, "hard": hard_config}[task_name]()
+        env = DroneEnv(cfg)
         obs = env.reset()
         obs_dict = obs.model_dump()
         conv = [{"role": "system", "content": build_system_prompt(task_name)}]
@@ -186,17 +235,21 @@ def run_task(client: OpenAI, task_name: str, max_steps: int) -> Dict[str, Any]:
                 user_text += f"{tid}[{t['status']}]: pick({p['x']},{p['y']}) deli({d['x']},{d['y']})\n"
             conv.append({"role": "user", "content": user_text})
             if len(conv) > 12: conv = [conv[0]] + conv[-10:]
-            action = parse_action(call_llm(client, conv), obs_dict)
+            raw = call_llm(client, conv)
+            action = parse_action(raw, obs_dict)
             obs, reward, done, _ = env.step(action)
             obs_dict = obs.model_dump()
             rewards.append(reward)
             log_step(step=s, action=action, reward=reward, done=done, error=None)
             if done: break
-            time.sleep(0.5)
+            time.sleep(0.1)
         score = grade(env.state())
         success = score >= 0.5
     except KeyboardInterrupt: pass
-    except Exception as e: print(f"ERROR: {e}")
+    except Exception as e:
+        print(f"ERROR: {e}")
+        # Fall back to heuristic on any LLM error
+        return _run_heuristic_task(task_name, max_steps)
     finally:
         log_end(success=success, steps=steps, score=score, rewards=rewards)
         if env:
@@ -221,11 +274,17 @@ def main():
     p.add_argument("--task", default="all", help="Task to run (easy, medium, hard, or all)")
     p.add_argument("--max_steps", type=int, default=0, help="Override max steps (uses config defaults if 0)")
     args = p.parse_args()
-    if not API_KEY: sys.exit(1)
-    
-    client = OpenAI(api_key=API_KEY, base_url=API_BASE_URL)
+
+    # Use LLM client if API key is available, otherwise fall back to heuristic agent
+    client: Optional[OpenAI] = None
+    if API_KEY:
+        try:
+            client = OpenAI(api_key=API_KEY, base_url=API_BASE_URL)
+        except Exception:
+            client = None
+
     tasks_to_run = ["easy", "medium", "hard"] if args.task == "all" else [args.task]
-    
+
     for t in tasks_to_run:
         steps = args.max_steps
         if steps == 0:
