@@ -82,15 +82,6 @@ def _drone_quality_score(state: Dict[str, Any]) -> float:
 
 
 def grade(state: Dict[str, Any]) -> float:
-    """
-    Grade a completed (or timed-out) medium-difficulty episode.
-
-    Args:
-        state: dict returned by env.state()
-
-    Returns:
-        float in [0.0, 1.0]
-    """
     tasks = state.get("tasks", {})
     if not tasks:
         return 0.0

@@ -45,16 +45,6 @@ P_YAW_THRASH       =    -5.0
 P_YAW_OVERSHOOT    =    -2.0
 
 class DroneEnv:
-    """
-    AeroSync AI advanced logistics environment.
-
-    Pipeline:
-        Task created → Robot assigns + picks from shelf →
-        Robot carries to dispatch zone → Robot places (DISPATCHED) →
-        Drone descends to dispatch zone + picks (IN_FLIGHT) →
-        Drone navigates via FlightWaypoints to delivery location →
-        Drone descends + places with precision check (DELIVERED)
-    """
 
     def __init__(self, task_config: Dict[str, Any]):
         self.config = task_config
@@ -88,7 +78,6 @@ class DroneEnv:
     # OpenEnv API
 
     def reset(self) -> AeroSyncObservation:
-        """Reset environment to initial state. Returns first observation."""
         cfg = copy.deepcopy(self._initial_config)
         self._step = 0
         self._dispatch_queue = []
@@ -153,7 +142,6 @@ class DroneEnv:
         return self._build_observation(reward=0.0)
 
     def step(self, action: AeroSyncAction) -> Tuple[AeroSyncObservation, float, bool, EpisodeInfo]:
-        """Execute one action for one agent. Returns (obs, reward, done, info)."""
         rb = AeroSyncReward()
         info = EpisodeInfo()
         self._step += 1
@@ -246,7 +234,6 @@ class DroneEnv:
         return self._build_observation(total_reward), total_reward, self._is_done(), info
 
     def state(self) -> Dict[str, Any]:
-        """Return raw environment state as a plain dict."""
         return {
             "step": self._step,
             "max_steps": self.max_steps,
@@ -597,7 +584,6 @@ class DroneEnv:
 
 
     def _accept_flight_plan(self, drone: DroneAgentState, waypoints: List[FlightWaypoint]):
-        """Validate and store a new flight plan submitted via AeroSyncAction.waypoints."""
         plan = DroneFlightPath(
             drone_id=drone.agent_id,
             waypoints=waypoints,
@@ -613,7 +599,6 @@ class DroneEnv:
         drone.flight.flight_plan = plan
 
     def _advance_waypoints(self, drone: DroneAgentState, info: EpisodeInfo):
-        """Stamp waypoint outcomes each step drone arrives at a waypoint position."""
         plan = getattr(drone.flight, "flight_plan", None)
         if plan is None or plan.current_waypoint_idx >= len(plan.waypoints):
             return
@@ -697,7 +682,6 @@ class DroneEnv:
         )
 
     def bfs_path(self, start: Position, goal: Position, agent_type: AgentType) -> List[str]:
-        """BFS shortest path; drones fly over obstacles."""
         from collections import deque
         if start.x == goal.x and start.y == goal.y:
             return []

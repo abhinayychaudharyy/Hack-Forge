@@ -45,10 +45,6 @@ def _delivered_set(tasks: Dict[str, Any]) -> list:
 
 
 def _priority_score(tasks: Dict[str, Any]) -> float:
-    """
-    Fraction of max-possible priority achieved by delivered tasks.
-    Returns 0.0 – 1.0.  Priority 3 = urgent (best), 1 = normal.
-    """
     delivered = _delivered_set(tasks)
     if not delivered:
         return 0.0
@@ -58,14 +54,6 @@ def _priority_score(tasks: Dict[str, Any]) -> float:
 
 
 def _drone_quality_score(state: Dict[str, Any]) -> float:
-    """
-    Composite drone performance score [0.0, 1.0] based on:
-      - Hover stability on deliveries
-      - Near-miss events (obstacle < 1 cell)
-      - Motor health degradation from collisions
-      - Delivery precision (successful vs failed drops)
-      - Forced RTB ratio vs total drones
-    """
     drone_states = state.get("drone_states", {})
     if not drone_states:
         return 1.0   # no drones → full score (not penalised)
@@ -111,7 +99,6 @@ def _drone_quality_score(state: Dict[str, Any]) -> float:
 
 
 def _count_drone_failures(state: Dict[str, Any]) -> int:
-    """Total forced RTB events across all drones."""
     total = 0
     for d in state.get("drone_states", {}).values():
         diag = d.get("diagnostics", {}) if isinstance(d, dict) else {}
@@ -120,7 +107,6 @@ def _count_drone_failures(state: Dict[str, Any]) -> int:
 
 
 def _count_near_misses(state: Dict[str, Any]) -> int:
-    """Total near-miss steps (obstacle < 1 cell) across all drones."""
     total = 0
     for d in state.get("drone_states", {}).values():
         diag = d.get("diagnostics", {}) if isinstance(d, dict) else {}
@@ -130,15 +116,6 @@ def _count_near_misses(state: Dict[str, Any]) -> int:
 
 
 def grade(state: Dict[str, Any]) -> float:
-    """
-    Grade a completed (or timed-out) episode.
-
-    Args:
-        state: dict returned by env.state()
-
-    Returns:
-        float in [0.0, 1.0]
-    """
     task_name = state.get("task_name", "easy")
     params    = GRADE_PARAMS.get(task_name, GRADE_PARAMS["easy"])
     tasks     = state.get("tasks", {})
@@ -183,7 +160,6 @@ def grade(state: Dict[str, Any]) -> float:
 
 
 def detailed_report(state: Dict[str, Any]) -> Dict[str, Any]:
-    """Return a detailed grading breakdown for inspection and logging."""
     task_name = state.get("task_name", "easy")
     tasks     = state.get("tasks", {})
     total     = len(tasks)

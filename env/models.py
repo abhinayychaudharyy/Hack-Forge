@@ -42,7 +42,6 @@ class Direction(str, Enum):
 
 
 class FlightMode(str, Enum):
-    """Drone-only: active flight behaviour mode"""
     CRUISE    = "cruise"     # normal A-to-B movement, speed optimised
     HOVER     = "hover"      # stationary mid-air, high stability demand
     LANDING   = "landing"    # descending to deliver / dock
@@ -52,7 +51,6 @@ class FlightMode(str, Enum):
 
 
 class WindCondition(str, Enum):
-    """Environmental wind level affecting hover stability"""
     CALM     = "calm"      # 0-5 km/h — no stability cost
     LIGHT    = "light"     # 5-15 km/h — minor drift
     MODERATE = "moderate"  # 15-30 km/h — noticeable battery drain
@@ -104,7 +102,6 @@ class GridCell(BaseModel):
 
 
 class DroneTiltState(BaseModel):
-    """Pitch / Roll / Yaw of drone body frame — drives diagonal movement"""
     pitch: float = Field(0.0, ge=-45.0, le=45.0,
                          description="Nose up(+)/down(-) in degrees; negative=forward acceleration")
     roll: float  = Field(0.0, ge=-45.0, le=45.0,
@@ -122,7 +119,6 @@ class DroneTiltState(BaseModel):
 
 
 class FlightWaypoint(BaseModel):
-    """One leg of a multi-direction planned path"""
     position: Position              = Field(...,  description="Target grid cell")
     direction: Direction            = Field(...,  description="Approach direction into this waypoint")
     tilt: Optional[DroneTiltState]  = Field(None, description="Desired tilt for this leg")
@@ -146,10 +142,6 @@ class FlightWaypoint(BaseModel):
 
 
 class DroneFlightPath(BaseModel):
-    """
-    Full multi-leg planned path — inference.py writes this,
-    env.step() consumes it waypoint by waypoint each step.
-    """
     drone_id: str                   = Field(..., description="Owner drone ID")
     waypoints: List[FlightWaypoint] = Field(default_factory=list, description="Ordered legs")
     current_waypoint_idx: int       = Field(0, ge=0,   description="Active leg index")
@@ -161,10 +153,6 @@ class DroneFlightPath(BaseModel):
 
 
 class DroneFlightParams(BaseModel):
-    """
-    Per-drone flight physics — fed into inference.py to let the LLM
-    policy make battery-aware, stability-aware routing decisions.
-    """
 
     max_speed: float              = Field(2.0,  ge=0.1, le=10.0, description="Max cells/step in CRUISE mode")
     current_speed: float          = Field(0.0,  ge=0.0, le=10.0, description="Actual speed this step")
@@ -207,9 +195,6 @@ class DroneFlightParams(BaseModel):
 
 
 class DroneDiagnostics(BaseModel):
-    """
-    Live telemetry snapshot — populated each step.
-    """
     drone_id: str                = Field(...,   description="Matches AgentState.agent_id")
     motor_health: float          = Field(1.0,  ge=0.0, le=1.0, description="1.0=all motors nominal")
     collision_risk: float        = Field(0.0,  ge=0.0, le=1.0, description="Proximity-based collision probability")
@@ -225,10 +210,6 @@ class DroneDiagnostics(BaseModel):
 
 
 class DroneAgentState(AgentState):
-    """
-    Extends AgentState with full drone-specific params.
-    agent_type is locked to DRONE.
-    """
     agent_type: AgentType      = Field(AgentType.DRONE, description="Always DRONE")
     flight: DroneFlightParams  = Field(default_factory=DroneFlightParams,
                                        description="Full flight physics & battery params")
@@ -238,7 +219,6 @@ class DroneAgentState(AgentState):
 # OpenEnv Core Models
 
 class AeroSyncObservation(BaseModel):
-    """Full observation returned by reset() and step()"""
     step: int                                = Field(..., description="Current step number")
     max_steps: int                           = Field(..., description="Max steps per episode")
     agents: Dict[str, AgentState]            = Field(..., description="All agents keyed by ID")
@@ -262,7 +242,6 @@ class AeroSyncObservation(BaseModel):
 
 
 class AeroSyncAction(BaseModel):
-    """Action issued to the environment"""
     agent_id: str                            = Field(..., description="Which agent to act")
     action_type: ActionType                  = Field(..., description="What action to perform")
     direction: Optional[Direction]           = Field(None, description="Direction for MOVE action")
@@ -278,7 +257,6 @@ class AeroSyncAction(BaseModel):
 
 
 class AeroSyncReward(BaseModel):
-    """Detailed reward breakdown (returned inside info dict)"""
 
     total: float               = Field(0.0)
     delivery_bonus: float      = Field(0.0)
@@ -332,7 +310,6 @@ class AeroSyncReward(BaseModel):
 
 
 class EpisodeInfo(BaseModel):
-    """Extra info returned by step()"""
     reward_breakdown: AeroSyncReward    = Field(default_factory=AeroSyncReward)
     collision_events: List[str]         = Field(default_factory=list)
     battery_failures: List[str]         = Field(default_factory=list)

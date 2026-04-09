@@ -34,7 +34,6 @@ _TASK_METADATA: Dict[str, Dict[str, Any]] = {}
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Build task metadata cache at startup."""
     for task_name, config_fn in TASK_CONFIGS.items():
         cfg = config_fn()
         params = GRADE_PARAMS.get(task_name, GRADE_PARAMS["easy"])
@@ -150,7 +149,6 @@ class MetricsResponse(BaseModel):
 
 @app.get("/")
 def root():
-    """Redirect to the dashboard."""
     return RedirectResponse(url="/web")
 
 @app.get("/health")
@@ -177,7 +175,6 @@ def health():
 
 @app.get("/tasks")
 def list_tasks():
-    """List all available tasks with metadata (weights pulled from grader.py)."""
     if _TASK_METADATA:
         return {"tasks": list(_TASK_METADATA.values())}
     tasks_out = []
@@ -297,7 +294,6 @@ def bfs_path(request: BFSRequest):
 
 @app.get("/openenv.yaml", response_class=PlainTextResponse)
 def get_openenv_yaml():
-    """Serve the openenv.yaml spec file."""
     yaml_path = Path(__file__).parent.parent / "openenv.yaml"
     if yaml_path.exists():
         return yaml_path.read_text(encoding="utf-8")
@@ -311,10 +307,6 @@ def get_openenv_yaml():
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
-    """
-    Persistent WebSocket session for OpenEnv agents.
-    Handles a full mission lifecycle (reset -> steps -> done).
-    """
     await websocket.accept()
     local_env: Optional[DroneEnv] = None
     
@@ -367,7 +359,6 @@ async def websocket_endpoint(websocket: WebSocket):
 
 @app.get("/web", response_class=HTMLResponse)
 def dashboard():
-    """Enhanced dashboard with drone telemetry and mission progress."""
     env_summary = "Environment Uninitialized"
     metrics_block = ""
     
@@ -385,9 +376,6 @@ def dashboard():
             <div class="stat">Collisions: {s.get('collision_count', 0)}</div>
             <div class="stat">Battery Fails: {s.get('battery_failures', 0)}</div>
             <div class="stat">Score: {grade(s):.4f}</div>
-        """
-
-    return f"""
     <html>
         <head>
             <title>AeroSync AI Dashboard</title>
