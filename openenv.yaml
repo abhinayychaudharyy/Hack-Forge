@@ -22,7 +22,8 @@ author: AeroSync AI Team
 license: MIT
 
 tasks:
-  - name: easy
+  - id: easy
+    name: easy
     description: "2 drones, 2 deliveries. Open 10x10 grid, no obstacles, full battery — learn the pick-hover-place pipeline."
     difficulty: 1
     agents:
@@ -30,16 +31,14 @@ tasks:
     task_count: 4
     max_steps: 120
     
-    has_grader: true
-    grader:
-      file: grader/easy.py
-      entrypoint: grade
+    grader: "grader.easy:grade"
 
     expected_score_random: 0.10
     expected_score_baseline: 0.45
 
 
-  - name: medium
+  - id: medium
+    name: medium
     description: "4 drones, 6 deliveries. Battery management, obstacles, priority scheduling."
     difficulty: 2
     agents:
@@ -47,16 +46,14 @@ tasks:
     task_count: 6
     max_steps: 250
     
-    has_grader: true
-    grader:
-      file: grader/medium.py
-      entrypoint: grade
+    grader: "grader.medium:grade"
 
     expected_score_random: 0.07
     expected_score_baseline: 0.32
 
 
-  - name: hard
+  - id: hard
+    name: hard
     description: "6 drones (2 battery-degraded), 12 deliveries (3 urgent p=3, 4 express p=2, 5 normal p=1). 20x20 grid with walls and pillars. Collision avoidance critical."
     difficulty: 3
     agents:
@@ -64,10 +61,7 @@ tasks:
     task_count: 12
     max_steps: 500
     
-    has_grader: true
-    grader:
-      file: grader/hard.py
-      entrypoint: grade
+    grader: "grader.hard:grade"
 
     expected_score_random: 0.05
     expected_score_baseline: 0.22
