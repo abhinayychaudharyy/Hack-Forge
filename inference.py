@@ -51,7 +51,7 @@ def log_step(*, step: int, action: Any, reward: float, done: bool, error: Option
 def log_end(*, success: bool, steps: int, score: float, rewards: List[float]) -> None:
     success_str = "true" if success else "false"
     rewards_str = ",".join([f"{r:.2f}" for r in rewards])
-    print(f"[END] success={success_str} steps={steps} score={score:.2f} rewards={rewards_str}", flush=True)
+    print(f"[END] success={success_str} steps={steps} score={score:.4f} rewards={rewards_str}", flush=True)
 
 
 def build_system_prompt(task_name: str) -> str:
