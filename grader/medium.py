@@ -84,7 +84,7 @@ def _drone_quality_score(state: Dict[str, Any]) -> float:
 def grade(state: Dict[str, Any]) -> float:
     tasks = state.get("tasks", {})
     if not tasks:
-        return 0.0
+        return 0.0001
 
     total_tasks      = len(tasks)
     delivered        = len(_delivered_set(tasks))
@@ -124,4 +124,4 @@ def grade(state: Dict[str, Any]) -> float:
         + _WEIGHTS["drone_weight"]      * drone_score
     )
 
-    return round(float(min(1.0, max(0.0, score))), 4)
+    return round(float(min(0.9999, max(0.0001, score))), 4)
