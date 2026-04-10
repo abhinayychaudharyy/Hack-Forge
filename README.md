@@ -19,6 +19,17 @@ license: mit
 
 An [OpenEnv](https://huggingface.co/openenv)-compliant environment that simulates a **real-world warehouse-to-doorstep drone delivery pipeline**. Autonomous drones pick packages directly from warehouse shelves, fly through a 3D grid with altitude layers and wind physics, and deliver to customer locations.
 
+## Links
+
+| Where | URL |
+|-------|-----|
+| **Source (GitHub)** | [https://github.com/abhinayychaudharyy/Hack-Forge](https://github.com/abhinayychaudharyy/Hack-Forge) |
+| **Clone** | `git clone https://github.com/abhinayychaudharyy/Hack-Forge.git` |
+| **Hugging Face Space (live)** | [https://vj-ai27-hack-forge.hf.space](https://vj-ai27-hack-forge.hf.space) |
+| **API reference (Swagger)** | [https://vj-ai27-hack-forge.hf.space/docs](https://vj-ai27-hack-forge.hf.space/docs) |
+
+Use the Space root for the web dashboard and HTTP/WebSocket calls; use **`/docs`** to explore and try `POST /reset`, `POST /step`, `GET /grade`, etc., interactively ([AeroSync AI – Swagger UI](https://vj-ai27-hack-forge.hf.space/docs)).
+
 ---
 
 ## Repository layout
@@ -74,7 +85,7 @@ Drone-env focuses on the **Urban Air Mobility (UAM)** challenge:
   - (0,0) is Top-Left.
   - **SOUTH increases Y** (Down on grid).
   - **EAST increases X** (Right on grid).
-- **Altitude Layers**: Drones cruise at $Z=1$ to avoid obstacles and descend to $Z=0$ only for **PICK** and **PLACE**.
+- **Altitude Layers**: Drones cruise at `Z=1` to avoid obstacles and descend to `Z=0` only for **PICK** and **PLACE**.
 - **Physics-Informed Rewards**: Drones are penalized for instability, near-misses, and battery depletion, while being rewarded for efficient delivery and smooth handling.
 
 ---
@@ -108,7 +119,7 @@ Drone-env provides **Meaningful Rewards** with dense partial progress signals:
 
 ## Episode loop: reset, step, and grade
 
-The server follows the standard OpenEnv pattern: you **reset** a task, **step** with actions until the episode ends (or you stop), then **grade** the final state. Per-step values in `observation.reward` are for learning signals; the **grade** is a separate $[0,1]$ score used for evaluation and leaderboards.
+The server follows the standard OpenEnv pattern: you **reset** a task, **step** with actions until the episode ends (or you stop), then **grade** the final state. Per-step values in `observation.reward` are for learning signals; the **grade** is a separate **[0, 1]** score used for evaluation and leaderboards.
 
 ### Reset (`POST /reset`)
 
@@ -130,7 +141,7 @@ The episode may terminate when all tasks are finished, time runs out (`step >= m
 ### Grade (`GET /grade`)
 
 - **Input**: No body; grading uses the **current** full environment state from `env.state()` after your steps.
-- **Returns**: `score` in $[0.0, 1.0]$ and a `report` dictionary from `detailed_report()` (completion counts, safety metrics, drone-quality breakdown, and the same `final_score`).
+- **Returns**: `score` in **[0.0, 1.0]** and a `report` dictionary from `detailed_report()` (completion counts, safety metrics, drone-quality breakdown, and the same `final_score`).
 
 Grading is **deterministic** given the final state: same state dict always yields the same score.
 
@@ -143,14 +154,22 @@ Implementation lives in `grader/grader.py`. The function `grade(state)` reads `t
 | Component | Meaning | How it is derived |
 |-----------|---------|-------------------|
 | **Completion** | Fraction of tasks delivered | Count of tasks with status `delivered` divided by total tasks. |
-| **Efficiency** | Time use vs. horizon | $\max\bigl(0,\ 1 - \frac{\texttt{step}}{\texttt{max\_steps}} \times 0.5\bigr)$ (more steps lower this term; it is floored at $0$; at `step == max_steps` the factor inside the max is $0.5$). |
-| **Safety** | Penalties for incidents | Starts at $1.0$, then subtracts weighted counts: collisions ($0.10$ each), battery failures ($0.15$ each), forced RTB events summed from drone diagnostics ($0.05$ each), obstacle near-miss counts ($0.03$ each). Result is clamped to $[0, 1]$. |
-| **Priority** | Important deliveries | Among **delivered** tasks only: average of $\texttt{priority}/3$ (priorities are capped at $3$ in the normalization). |
-| **Drone quality** | Smooth, healthy operation | Score in $[0,1]$ from drone diagnostics: caps on deductions for near-misses and forced RTB, extra penalty if average motor health falls below $0.8$, hover stability below $0.7$, and failed place attempts vs. successful deliveries. |
+| **Efficiency** | Time use vs. horizon | `max(0, 1 - (step / max_steps) * 0.5)` — more steps lower this term; floored at 0; when `step == max_steps` the inner value is **0.5**. |
+| **Safety** | Penalties for incidents | Starts at **1.0**, then subtracts weighted counts: collisions (**0.10** each), battery failures (**0.15** each), forced RTB events from drone diagnostics (**0.05** each), obstacle near-miss counts (**0.03** each). Result is clamped to **[0, 1]**. |
+| **Priority** | Important deliveries | Among **delivered** tasks only: sum of `priority` divided by `3 × (number delivered)` (same as average `priority / 3` when priorities are capped at 3). |
+| **Drone quality** | Smooth, healthy operation | Score in **[0, 1]** from drone diagnostics: caps on deductions for near-misses and forced RTB, extra penalty if average motor health falls below **0.8**, hover stability below **0.7**, and failed place attempts vs. successful deliveries. |
 
-**Weighted sum** (then clamped to $[0, 1]$ and rounded to four decimals):
+**Weighted sum** (then clamped to **[0, 1]** and rounded to four decimals):
 
-$$\texttt{score} = w_c \cdot \texttt{completion} + w_e \cdot \texttt{efficiency} + w_s \cdot \texttt{safety} + w_p \cdot \texttt{priority} + w_d \cdot \texttt{drone\_quality}$$
+```text
+score = w_completion * completion
+      + w_efficiency * efficiency
+      + w_safety * safety
+      + w_priority * priority
+      + w_drone_quality * drone_quality
+```
+
+(`w_*` are the per-task weights from `GRADE_PARAMS`; names match the columns in the table below.)
 
 **Per-task weights** (`completion`, `efficiency`, `safety`, `priority`, `drone_quality`):
 
@@ -173,19 +192,26 @@ Task-specific modules `grader/easy.py`, `grader/medium.py`, and `grader/hard.py`
 Drone-env supports the standard OpenEnv protocol for both synchronous and asynchronous agent interaction.
 
 ### 📦 Installation
-Install the client package directly from this Space:
+Clone the GitHub repo and install dependencies (the examples use root-level `client.py`, so run them from the repo root or set `PYTHONPATH` to include it):
+
 ```bash
-pip install git+https://huggingface.co/spaces/abhinayychaudharyy/aerosync-ai
+git clone https://github.com/abhinayychaudharyy/Hack-Forge.git
+cd Hack-Forge
+pip install -r requirements.txt
 ```
 
+You can also install the packaged modules from GitHub (`env`, `tasks`, `grader`): `pip install "git+https://github.com/abhinayychaudharyy/Hack-Forge.git"` — for the **`client` helpers**, prefer a local clone as above.
+
 ### 🤖 Basic Usage (Python Client)
+Point `base_url` at the deployed Hugging Face Space (same host as [Swagger `/docs`](https://vj-ai27-hack-forge.hf.space/docs)):
+
 ```python
 import asyncio
 from client import DroneEnv, AeroSyncAction
 
 async def main():
     # 1. Connect to the Space (Async)
-    async with DroneEnv(base_url="https://abhinayychaudharyy-aerosync-ai.hf.space") as env:
+    async with DroneEnv(base_url="https://vj-ai27-hack-forge.hf.space") as env:
         # 2. Reset the environment
         obs = await env.reset(task_name="easy")
         print(f"Mission Start at Step {obs.step}")
@@ -198,10 +224,12 @@ async def main():
 asyncio.run(main())
 ```
 
-### 🛰️ Live Dashboard
-Visit the **Interactive Dashboard** to see live drone telemetry and mission progress:
-- **Web UI**: [https://vj-ai27-hack-forge.hf.space/web](https://vj-ai27-hack-forge.hf.space/web)
-- **WebSocket**: `wss://vj-ai27-hack-forge.hf.space/ws` (for high-frequency agents)
+### 🛰️ Live Space (Hugging Face)
+Deployed app: [https://vj-ai27-hack-forge.hf.space](https://vj-ai27-hack-forge.hf.space)
+
+- **Interactive dashboard**: [https://vj-ai27-hack-forge.hf.space/web](https://vj-ai27-hack-forge.hf.space/web)
+- **OpenAPI / Swagger**: [https://vj-ai27-hack-forge.hf.space/docs](https://vj-ai27-hack-forge.hf.space/docs)
+- **WebSocket** (agents): `wss://vj-ai27-hack-forge.hf.space/ws`
 
 ---
 

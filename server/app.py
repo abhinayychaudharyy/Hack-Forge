@@ -21,7 +21,7 @@ from tasks.medium import get_config as medium_config
 from tasks.hard   import get_config as hard_config
 
 _VERSION = "1.2.0"
-_ENV_NAME = "aerosync-ai"
+_ENV_NAME = "Drone-env"
 
 TASK_CONFIGS: Dict[str, Any] = {
     "easy":   easy_config,
