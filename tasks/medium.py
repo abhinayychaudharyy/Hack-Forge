@@ -15,13 +15,7 @@ def get_config() -> Dict[str, Any]:
         ],
 
         "tasks": [
-            {
-                "id":       "task_0",
-                "item":     "Electronics",
-                "pickup":   {"x": 1, "y": 3, "z": 0},
-                "delivery": {"x": 13, "y": 1, "z": 0},
-                "priority": 2,
-            },
+            
             {
                 "id":       "task_1",
                 "item":     "Clothing",

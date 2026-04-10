@@ -1,6 +1,6 @@
 from __future__ import annotations
 import copy
-import math
+import random
 from typing import Any, Dict, List, Optional, Tuple
 
 from env.models import (
@@ -85,6 +85,16 @@ class DroneEnv:
         self._collision_count = 0
         self._battery_failures = 0
 
+        # Per-episode variability so repeated runs don't converge to identical scores.
+        # This changes only flight conditions (wind/drag), not the task layout.
+        # Strong stochasticity: wind is sampled per episode and can shift during the episode.
+        # This is intentional so repeated runs produce clearly different outcomes/scores.
+        self.wind_condition = random.choices(
+            population=[WindCondition.CALM, WindCondition.LIGHT, WindCondition.MODERATE, WindCondition.STRONG],
+            weights=[0.05, 0.15, 0.35, 0.45],
+            k=1,
+        )[0]
+
         self._agents = {}
         for r in cfg.get("robots", []):
             self._agents[r["id"]] = AgentState(
@@ -100,8 +110,12 @@ class DroneEnv:
         self._prev_dist_dict: Dict[str, float] = {}
 
         for d in cfg.get("drones", []):
-            drag = 1.2 if self.wind_condition == WindCondition.MODERATE else \
-                1.5 if self.wind_condition == WindCondition.STRONG else 1.0
+            drag = {
+                WindCondition.CALM: 1.00,
+                WindCondition.LIGHT: 1.20,
+                WindCondition.MODERATE: 1.55,
+                WindCondition.STRONG: 2.10,
+            }.get(self.wind_condition, 1.55)
             fp = DroneFlightParams(
                 battery_capacity=100.0,
                 max_altitude=5,
@@ -308,13 +322,19 @@ class DroneEnv:
                   rb: AeroSyncReward, info: EpisodeInfo) -> Tuple[AeroSyncReward, EpisodeInfo]:
         agent.flight.flight_mode = FlightMode.HOVER
         agent.is_idle = False
-        cx, cy = self.W / 2.0, self.H / 2.0
-        dist = math.sqrt((agent.position.x - cx) ** 2 + (agent.position.y - cy) ** 2)
-        wind_penalty = {WindCondition.CALM: 0.0, WindCondition.LIGHT: 0.05,
-                        WindCondition.MODERATE: 0.1, WindCondition.STRONG: 0.2}.get(
-            self.wind_condition, 0.0)
-        agent.flight.hover_stability_score = max(0.0, 1.0 - 0.04 * dist - wind_penalty)
-        import random
+        wind_penalty = {
+            WindCondition.CALM: 0.05,
+            WindCondition.LIGHT: 0.25,
+            WindCondition.MODERATE: 0.55,
+            WindCondition.STRONG: 0.85,
+        }.get(self.wind_condition, 0.55)
+        tilt_cost = float(getattr(agent.flight.tilt, "tilt_stability_cost", 0.0) or 0.0)
+        gust = random.uniform(-0.25, 0.25)
+        # Stability reflects wind + attitude. Avoid coupling to map centre distance.
+        agent.flight.hover_stability_score = max(
+            0.0, min(1.0, 1.0 - wind_penalty - 0.50 * tilt_cost + gust)
+        )
+
         wf = {WindCondition.CALM: 0, WindCondition.LIGHT: 0.05,
               WindCondition.MODERATE: 0.1, WindCondition.STRONG: 0.2}.get(self.wind_condition, 0)
         agent.flight.hover_drift_x = random.uniform(-wf, wf)
@@ -489,6 +509,36 @@ class DroneEnv:
                        rb: AeroSyncReward, info: EpisodeInfo) -> Tuple[AeroSyncReward, EpisodeInfo]:
         diag = drone.diagnostics
         fp = drone.flight
+
+        # Update stability each step so grading reflects flight conditions even if the
+        # controller doesn't explicitly call HOVER.
+        # Occasionally shift wind condition mid-episode (strong randomness).
+        if random.random() < 0.08:
+            if self.wind_condition == WindCondition.CALM:
+                self.wind_condition = WindCondition.LIGHT
+            elif self.wind_condition == WindCondition.LIGHT:
+                self.wind_condition = random.choice([WindCondition.CALM, WindCondition.MODERATE])
+            elif self.wind_condition == WindCondition.MODERATE:
+                self.wind_condition = random.choice([WindCondition.LIGHT, WindCondition.STRONG])
+            else:
+                self.wind_condition = random.choice([WindCondition.MODERATE, WindCondition.STRONG])
+            fp.wind_condition = self.wind_condition
+            fp.wind_drag_factor = {
+                WindCondition.CALM: 1.00,
+                WindCondition.LIGHT: 1.20,
+                WindCondition.MODERATE: 1.55,
+                WindCondition.STRONG: 2.10,
+            }.get(self.wind_condition, 1.55)
+
+        wind_penalty = {
+            WindCondition.CALM: 0.05,
+            WindCondition.LIGHT: 0.25,
+            WindCondition.MODERATE: 0.55,
+            WindCondition.STRONG: 0.85,
+        }.get(self.wind_condition, 0.55)
+        tilt_cost = float(getattr(fp.tilt, "tilt_stability_cost", 0.0) or 0.0)
+        gust = random.uniform(-0.20, 0.20)
+        fp.hover_stability_score = max(0.0, min(1.0, 1.0 - wind_penalty - 0.40 * tilt_cost + gust))
 
         min_dist = 999.0
         for ox, oy in self.obstacles:

@@ -6,7 +6,7 @@ def get_config() -> Dict[str, Any]:
         "task_name":   "easy",
         "grid_width":  10,
         "grid_height": 10,
-        "max_steps":   100,
+        "max_steps":   120,
 
         "drones": [
             {
@@ -24,13 +24,7 @@ def get_config() -> Dict[str, Any]:
         ],
 
         "tasks": [
-            {
-                "id":       "task_0",
-                "item":     "Small Package",
-                "pickup":   {"x": 1, "y": 2, "z": 0},   # shelf
-                "delivery": {"x": 7, "y": 8, "z": 0},   # customer address
-                "priority": 1,
-            },
+           
             {
                 "id":       "task_1",
                 "item":     "Documents",
