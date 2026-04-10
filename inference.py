@@ -395,10 +395,14 @@ def run_task(
                 time.sleep(max(0.0, sleep_ms) / 1000.0)
         score = grade(env.state())
         success = score >= 0.5
-    except KeyboardInterrupt: pass
+    except KeyboardInterrupt:
+        pass
     except Exception as e:
         print(f"ERROR: {e}")
-        # Fall back to heuristic on any LLM error
+        # Log this LLM attempt's partial result first (score=0.01, steps so far).
+        log_end(success=False, steps=steps, score=score, rewards=rewards)
+        # Now delegate entirely to heuristic — it has its own log_start + log_end.
+        # No finally block, so only ONE [END] line appears for this task.
         return _run_heuristic_task(
             task_name,
             max_steps,
@@ -406,22 +410,22 @@ def run_task(
             print_state_every=print_state_every,
             run_nonce=run_nonce,
         )
-    finally:
-        log_end(success=success, steps=steps, score=score, rewards=rewards)
-        if env:
-            try:
-                report = detailed_report(env.state())
-                print("\n" + "="*40)
-                print("       DETAILED GRADING REPORT")
-                print("="*40)
-                for k, v in report.items():
-                    if isinstance(v, float):
-                        print(f"  {k:20} : {v:.4f}")
-                    else:
-                        print(f"  {k:20} : {v}")
-                print("="*40 + "\n")
-            except Exception as re:
-                print(f"  [DEBUG] Failed to generate report: {re}")
+    # Reached only on success or KeyboardInterrupt (not on Exception fallback above).
+    log_end(success=success, steps=steps, score=score, rewards=rewards)
+    if env:
+        try:
+            report = detailed_report(env.state())
+            print("\n" + "="*40)
+            print("       DETAILED GRADING REPORT")
+            print("="*40)
+            for k, v in report.items():
+                if isinstance(v, float):
+                    print(f"  {k:20} : {v:.4f}")
+                else:
+                    print(f"  {k:20} : {v}")
+            print("="*40 + "\n")
+        except Exception as re:
+            print(f"  [DEBUG] Failed to generate report: {re}")
     return {"score": score}
 
 

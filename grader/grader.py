@@ -1,4 +1,5 @@
 from __future__ import annotations
+import math
 from typing import Any, Dict
 
 from env.models import TaskStatus
@@ -47,16 +48,17 @@ def _delivered_set(tasks: Dict[str, Any]) -> list:
 def _priority_score(tasks: Dict[str, Any]) -> float:
     delivered = _delivered_set(tasks)
     if not delivered:
-        return 0.0
+        return 0.01
     total_priority = sum(t.get("priority", 1) for t in delivered)
     max_possible   = 3 * len(delivered)
-    return total_priority / max_possible if max_possible > 0 else 0.0
+    raw = total_priority / max_possible if max_possible > 0 else 0.01
+    return float(min(0.99, max(0.01, raw)))
 
 
 def _drone_quality_score(state: Dict[str, Any]) -> float:
     drone_states = state.get("drone_states", {})
     if not drone_states:
-        return 1.0   # no drones → full score (not penalised)
+        return 0.99   # no drones → treat as near-full score (not penalised)
 
     total_near_misses  = 0
     total_forced_rtb   = 0
@@ -95,7 +97,8 @@ def _drone_quality_score(state: Dict[str, Any]) -> float:
         drop_failure_rate = total_failed_drops / total_attempts
         deduction += min(drop_failure_rate * 0.2, 0.2)
 
-    return round(float(max(0.0, 1.0 - deduction)), 4)
+    raw = round(float(max(0.0, 1.0 - deduction)), 4)
+    return float(min(0.99, max(0.01, raw)))
 
 
 def _count_drone_failures(state: Dict[str, Any]) -> int:
@@ -156,7 +159,9 @@ def grade(state: Dict[str, Any]) -> float:
         + params["drone_weight"]      * drone_score
     )
 
-    return float(min(0.99, max(0.01, score)))
+    if not math.isfinite(score):
+        score = 0.01
+    return float(min(0.99, max(0.01, round(score, 6))))
 
 
 def detailed_report(state: Dict[str, Any]) -> Dict[str, Any]:
