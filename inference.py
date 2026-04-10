@@ -98,7 +98,7 @@ def _clean_content(content: str) -> str:
 def call_llm(client: OpenAI, messages: List[Dict]) -> Optional[Dict]:
     for _ in range(3):
         try:
-            resp = client.chat.completions.create(model=MODEL_NAME, messages=messages, temperature=0.4, max_tokens=1024)
+            resp = client.chat.completions.create(model=MODEL_NAME, messages=messages, temperature=0.4, max_tokens=1024, timeout=10.0)
             c = resp.choices[0].message.content.strip()
             j = _clean_content(c)
             if j: return json.loads(j)
@@ -279,7 +279,7 @@ def main():
     client: Optional[OpenAI] = None
     if API_KEY:
         try:
-            client = OpenAI(api_key=API_KEY, base_url=API_BASE_URL)
+            client = OpenAI(api_key=API_KEY, base_url=API_BASE_URL, timeout=10.0, max_retries=1)
         except Exception:
             client = None
 
