@@ -294,7 +294,7 @@ def _navigate_toward(
 
 def _run_heuristic_task(task_name: str, max_steps: int, *, sleep_ms: int, print_state_every: int, run_nonce: str) -> Dict[str, Any]:
     """Run a task using the deterministic heuristic agent (no LLM needed)."""
-    score, success, steps, rewards = 0.0, False, 0, []
+    score, success, steps, rewards = 0.01, False, 0, []
     log_start(task=task_name, env=BENCHMARK, model=f"heuristic({run_nonce})")
     env = None
     try:
@@ -360,7 +360,7 @@ def run_task(
             run_nonce=run_nonce,
         )
 
-    score, success, steps, rewards = 0.0, False, 0, []
+    score, success, steps, rewards = 0.01, False, 0, []
     log_start(task=task_name, env=BENCHMARK, model=f"{MODEL_NAME}({run_nonce})")
     env = None
     try:
